@@ -1,3 +1,7 @@
+> **SUPERSEDED** — this seed document is kept for history. The current design is
+> [docs/10-GAME_DESIGN.md](docs/10-GAME_DESIGN.md) (GDD v2.0); start at
+> [docs/00-OVERVIEW.md](docs/00-OVERVIEW.md).
+
 # Trainsportstation GDD v1.1
 
 ## Vision
