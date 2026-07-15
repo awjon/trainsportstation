@@ -1,26 +1,12 @@
 # Architecture
 
-Stack: Three.js, TypeScript, Vite.
+> **SUPERSEDED** — the normative technical architecture is
+> [docs/30-TECH_ARCHITECTURE.md](docs/30-TECH_ARCHITECTURE.md); start at
+> [docs/00-OVERVIEW.md](docs/00-OVERVIEW.md) for the full document map.
 
-Principles:
-- Deterministic simulation.
-- ECS-inspired composition.
-- Data over code.
-- Fixed timestep.
-- Shared runtime/editor.
-
-Modules:
-core/
-simulation/
-track/
-train/
-camera/
-editor/
-ui/
-audio/
-effects/
-data/
-scenarios/
-
-Replay stores player inputs only.
-Scenario JSON defines biome, countdown, trains, stations, allowedPieces, hazards, objectives and stars.
+Original seed principles, preserved for history (all carried forward into docs/30):
+Three.js + TypeScript + Vite · deterministic simulation · ECS-inspired composition · data
+over code · fixed timestep · shared runtime/editor · modules `core/ simulation/ track/
+train/ camera/ editor/ ui/ audio/ effects/ data/ scenarios/` · replay stores player inputs
+only · scenario JSON defines biome, countdown, trains, stations, allowedPieces, hazards,
+objectives and stars.
