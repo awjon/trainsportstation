@@ -37,9 +37,10 @@ src/
   track/        # HEADLESS piece definitions, placement validation, track graph, splines/LUTs.
   train/        # HEADLESS train movement, arcade physics, crash detection.
   data/         # Static data as typed JSON: pieces.json, physics.json, personas.json,
-                #   assets.json, worldmap.json, biomes.json + TS loaders/validators.
+                #   worldmap.json, biomes.json + TS loaders/validators.
   scenarios/    # Shipped scenario JSON files (see 40-SCENARIO_SCHEMA.md) + validateScenario().
-  render/       # Three.js scene, GLTF loading, instancing, biome tinting, payoff sequences.
+  core/curves + render/meshgen/   # Procedural asset generation (see 60-ASSET_PIPELINE.md).
+  render/       # Three.js scene, procedural meshgen, instancing, biome tinting, payoff sequences.
   camera/       # Orbit rig, framing, payoff dolly moves.
   effects/      # Particles, confetti, crash gags (render-only, may be non-deterministic).
   audio/        # WebAudio wrapper, event→sfx mapping table.
@@ -119,7 +120,7 @@ export interface PieceDef {
   footprint: CellCoord[];           // piece-local cells occupied (straight=[{0,0}], curve-large=2x2, …)
   ports: Port[];
   paths: PathDef[];                 // junction has 3 ports / 2 paths + switch; crossing 4 ports / 2 independent paths
-  model: AssetId;                   // see data/assets.json, 60-ASSET_PIPELINE.md
+  model: AssetId;                   // meshgen builder key (60-ASSET_PIPELINE.md §4), not a file
   tags: ('jumpCapable' | 'switch' | 'elevated' | 'covered')[];
 }
 
@@ -199,10 +200,10 @@ type-check and validate).
 
 ## 5. Track model
 
-- The stage is a `grid.width × grid.height` field of *cells*. One cell = the footprint of one
-  Kenney track module. `CELL_SIZE` (world units per cell) is measured from
-  `railroad-straight.glb` bounds in the M0 asset audit and recorded in `data/assets.json`;
-  all piece paths are authored in cell units and scaled by it.
+- The stage is a `grid.width × grid.height` field of *cells*. One cell = one track module
+  footprint. `CELL` (world units per cell, = 2.0) is a constant in
+  `render/meshgen/palette.ts`; all piece paths and geometry are authored in world units around
+  a cell centered at the origin (60 §3).
 - Terrain per cell: `height: HeightLevel` and optional feature `water | rock | forest | town`.
   Track requires port `height` to match terrain height unless the piece is `elevated` (bridge)
   or `covered` (tunnel, which requires `rock`/hill terrain above).
@@ -356,9 +357,10 @@ examples in 20 §3.1 exactly.
 
 ## 9. Rendering
 
-- **Loading:** GLTFLoader reads `data/assets.json` (manifest: id → file, footprint, scale —
-  see 60 §5). All models share `colormap.png`; enforce a single shared `MeshStandardMaterial`
-  (flat-shaded look, no env maps) so every piece type can be an `InstancedMesh`.
+- **Assets:** all geometry is generated at runtime by `render/meshgen/` (see
+  60-ASSET_PIPELINE.md) — no model or texture files. Every mesh carries a `color` vertex
+  attribute and renders through a single shared flat-shaded `MeshStandardMaterial`
+  (`vertexColors: true`, no env maps) so every piece type can be an `InstancedMesh`.
 - **Budgets:** ≤ 150 draw calls, ≤ 250k triangles, 60fps on a 2020 mid-range laptop iGPU;
   30fps floor on mobile (§12). One directional light + ambient; soft blob shadows
   (texture decal), not shadow maps, on low tier.

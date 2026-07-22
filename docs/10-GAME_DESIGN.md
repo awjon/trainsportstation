@@ -165,7 +165,7 @@ hazards).
 tick-tock that resolves into the dispatch whistle (the game's signature sound). Each biome
 has one loopable theme; payoff jingles are per-`payoff.type` variations on the main motif.
 Crash sfx are cartoon (slide-whistle, boing, distant "wilhelm-esque" honk) — never violent.
-Source: Kenney CC0 audio packs (60 §8).
+Source: synthesized at runtime via WebAudio (60 §7) — no audio files in the default build.
 
 **UX:** chunky, rounded, high-contrast UI over the diorama; one accent color per biome;
 everything animates in ≤ 200 ms; numbers always tally up (never appear); the world map is
