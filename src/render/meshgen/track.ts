@@ -7,7 +7,8 @@ import * as THREE from 'three';
 import { arcCurve, catmullCurve, lineCurve, sampleFrames, type Curve } from '../../core/curves';
 import { vec } from '../../core/math';
 import { CELL, HEIGHT_UNIT, PALETTE } from './palette';
-import { box, boxProfile, merge, paint, sweepProfile } from './sweep';
+import { box, boxProfile, paint, sweepProfile } from './sweep';
+import { buildAsset, type Asset } from './asset';
 
 export type PieceType =
   | 'straight'
@@ -147,41 +148,43 @@ function portalArch(z: number): THREE.BufferGeometry[] {
   return parts;
 }
 
-function leverPost(): THREE.BufferGeometry[] {
-  return [
-    box(0.14, 0.5, 0.14, PALETTE.steel, [HALF - 0.35, 0.25, 0.0]),
-    box(0.1, 0.1, 0.44, PALETTE.kid, [HALF - 0.35, 0.46, 0.18]),
-  ];
+/** Switch lever: a steel post (body) topped by a glowing signal flag (bloom layer). */
+function leverPost(): { body: THREE.BufferGeometry[]; glow: THREE.BufferGeometry[] } {
+  return {
+    body: [box(0.14, 0.5, 0.14, PALETTE.steel, [HALF - 0.35, 0.25, 0.0])],
+    glow: [box(0.12, 0.12, 0.44, PALETTE.signal, [HALF - 0.35, 0.46, 0.18])],
+  };
 }
 
 function crossingDeck(): THREE.BufferGeometry[] {
   return [box(CELL - 0.2, 0.08, CELL - 0.2, PALETTE.deck, [0, RAIL_Y - 0.13, 0])];
 }
 
-/** Build the merged geometry for a piece type (piece-local, one shared material). */
-export function buildPiece(type: PieceType): THREE.BufferGeometry {
-  let parts: THREE.BufferGeometry[] = [];
+/** Build a piece type as an Asset (shaded body + optional glow), piece-local. */
+export function buildPiece(type: PieceType): Asset {
+  let body: THREE.BufferGeometry[] = [];
+  const glow: THREE.BufferGeometry[] = [];
   switch (type) {
     case 'straight':
-      parts = railsForCurve(straightCurve());
+      body = railsForCurve(straightCurve());
       break;
     case 'curve-small':
-      parts = railsForCurve(curveSmall());
+      body = railsForCurve(curveSmall());
       break;
     case 'curve-large':
-      parts = railsForCurve(curveLarge(), { segments: 36 });
+      body = railsForCurve(curveLarge(), { segments: 36 });
       break;
     case 'ramp':
-      parts = railsForCurve(rampCurve());
+      body = railsForCurve(rampCurve());
       break;
     case 'hill':
-      parts = railsForCurve(hillCurve(), { segments: 40 });
+      body = railsForCurve(hillCurve(), { segments: 40 });
       break;
     case 'bump':
-      parts = railsForCurve(bumpCurve());
+      body = railsForCurve(bumpCurve());
       break;
     case 'bridge':
-      parts = [
+      body = [
         ...railsForCurve(lineCurve(vec(0, HEIGHT_UNIT, -HALF), vec(0, HEIGHT_UNIT, HALF)), {
           ballast: false,
         }),
@@ -189,24 +192,27 @@ export function buildPiece(type: PieceType): THREE.BufferGeometry {
       ];
       break;
     case 'tunnel':
-      parts = [...railsForCurve(straightCurve()), ...portalArch(-HALF + 0.15), ...portalArch(HALF - 0.15)];
+      body = [...railsForCurve(straightCurve()), ...portalArch(-HALF + 0.15), ...portalArch(HALF - 0.15)];
       break;
-    case 'junction':
-      parts = [
+    case 'junction': {
+      const lever = leverPost();
+      body = [
         ...railsForCurve(straightCurve(), { ballast: true }),
         ...railsForCurve(curveSmall(), { ballast: false, ties: false }),
-        ...leverPost(),
+        ...lever.body,
       ];
+      glow.push(...lever.glow);
       break;
+    }
     case 'crossing':
-      parts = [
+      body = [
         ...crossingDeck(),
         ...railsForCurve(straightCurve(), { ballast: false }),
         ...railsForCurve(lineCurve(vec(-HALF, 0, 0), vec(HALF, 0, 0)), { ballast: false }),
       ];
       break;
   }
-  return merge(parts);
+  return buildAsset(body, glow);
 }
 
 export const ALL_PIECES: PieceType[] = [

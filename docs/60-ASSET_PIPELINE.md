@@ -21,9 +21,13 @@ Reference implementation for everything in this doc already exists under
 
 1. **No binary assets.** No `.glb`, `.gltf`, `.png`, `.jpg`, `.ktx`. A build test asserts the
    repo (outside `docs/`) contains no such files (60 §8). Icons/audio: see §6, §7.
-2. **One shared material.** Every mesh renders through a single flat-shaded
-   `MeshStandardMaterial` with `vertexColors: true` (docs/30 §9). Color lives in each
-   geometry's `color` attribute (`paint()`), never in per-mesh materials.
+2. **One shared body material + baked lighting.** Every body mesh renders through a single
+   flat-shaded `MeshStandardMaterial` with `vertexColors: true` (docs/30 §9). Color lives in
+   each geometry's `color` attribute (`paint()`); soft lighting (hemispheric + gradient +
+   contact AO) is baked into that same attribute by `shade()`/`finalizeAsset` at build time —
+   free at runtime and preserved through `InstancedMesh`. Emissive lights (headlight, lamp,
+   junction signal) are kept as separate `glow` geometry on a bloom layer (`postfx.ts`,
+   unlit `MeshBasicMaterial`) so bloom is selective — only lights glow, never bright surfaces.
 3. **One attribute shape.** Every generated geometry is non-indexed with exactly
    `{ position, normal, color }` and no `uv`. `paint()` normalizes this so heterogeneous
    parts (swept tubes + box/cylinder primitives) always merge.
@@ -42,9 +46,13 @@ Reference implementation for everything in this doc already exists under
 | `src/core/curves.ts` | `Curve` (line/arc/catmull), `sampleFrames`, `curveLength`, `frameOffset` — shared by sim and meshgen |
 | `src/render/meshgen/palette.ts` | `CELL`, `HEIGHT_UNIT`, the `PALETTE` (single source of color truth) |
 | `src/render/meshgen/sweep.ts` | `sweepProfile`, `boxProfile`, `paint`, `merge`, `box`/`cyl`/`cone` primitives |
-| `src/render/meshgen/track.ts` | `buildPiece(type)` → merged geometry for each of the 10 `PieceType`s |
-| `src/render/meshgen/rollingstock.ts` | `makeLocomotive(color)`, `makeCarriage(kind, color)` |
-| `src/render/meshgen/structures.ts` | `makeStation(awningColor)`, `makeTree`, `makeHouse`, `makeLamp` |
+| `src/render/meshgen/sweep.ts` | + `roundedBox` (chamfered hero parts) |
+| `src/render/meshgen/shading.ts` | `shade`/`finalizeAsset` — bake hemispheric + gradient + contact lighting into vertex color |
+| `src/render/meshgen/asset.ts` | `Asset { body, glow }` + `buildAsset` — splits shaded body from emissive glow geometry |
+| `src/render/meshgen/track.ts` | `buildPiece(type): Asset` for each of the 10 `PieceType`s |
+| `src/render/meshgen/rollingstock.ts` | `makeLocomotive(color)`, `makeCarriage(kind, color)` → `Asset` |
+| `src/render/meshgen/structures.ts` | `makeStation(awningColor)`, `makeTree`, `makeHouse`, `makeLamp` → `Asset` |
+| `src/render/postfx.ts` | selective bloom (`BLOOM_LAYER`) — only emissive `glow` geometry blooms |
 
 ## 3. World constants (`palette.ts`)
 

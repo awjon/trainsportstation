@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { frameOffset, sampleFrames, type Curve } from '../../core/curves';
 
 /** A closed 2D profile in (right, up) local coordinates, world units. */
@@ -141,6 +142,20 @@ export function cyl(
 ): THREE.BufferGeometry {
   const g = new THREE.CylinderGeometry(rTop, rBot, h, radialSegments);
   if (pos) g.translate(pos[0], pos[1], pos[2]);
+  return paint(g, color);
+}
+
+/** A chamfered box — soft toy-like edges that catch the key light. For hero parts only. */
+export function roundedBox(
+  w: number,
+  h: number,
+  d: number,
+  color: THREE.ColorRepresentation,
+  opts: { bevel?: number; segments?: number; pos?: [number, number, number] } = {},
+): THREE.BufferGeometry {
+  const bevel = opts.bevel ?? Math.min(w, h, d) * 0.12;
+  const g = new RoundedBoxGeometry(w, h, d, opts.segments ?? 2, bevel);
+  if (opts.pos) g.translate(opts.pos[0], opts.pos[1], opts.pos[2]);
   return paint(g, color);
 }
 
