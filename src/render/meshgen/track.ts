@@ -182,26 +182,31 @@ function bridgeSpan(): THREE.BufferGeometry[] {
   return parts;
 }
 
+// Opening sized to clear the tallest train (locomotive chimney ≈ 1.2 high, body ≈ 0.9 wide).
+const TUNNEL_W = 1.5; // outer doorway width
+const TUNNEL_H = 1.42; // doorway height
+
 /** A stone tunnel mouth: a doorway frame with a dark opening, set into the hillside. */
 function tunnelMouth(z: number): THREE.BufferGeometry[] {
-  const w = GAUGE + 0.5; // ~1.2
-  const h = 0.82;
+  const w = TUNNEL_W;
+  const h = TUNNEL_H;
   return [
-    box(0.18, h, 0.3, PALETTE.stone, [-w / 2, h / 2, z]), // jambs
-    box(0.18, h, 0.3, PALETTE.stone, [w / 2, h / 2, z]),
-    box(w + 0.36, 0.2, 0.34, PALETTE.stone, [0, h + 0.08, z]), // lintel
+    box(0.2, h, 0.34, PALETTE.stone, [-w / 2, h / 2, z]), // jambs
+    box(0.2, h, 0.34, PALETTE.stone, [w / 2, h / 2, z]),
+    box(w + 0.4, 0.22, 0.38, PALETTE.stone, [0, h + 0.09, z]), // lintel
     box(w - 0.06, h - 0.06, 0.08, PALETTE.chimney, [0, (h - 0.06) / 2, z]), // dark opening
   ];
 }
 
 /**
- * Tunnel as a low grassy hill over the straight track, with a stone doorway at each end so the
- * track clearly passes *through* the hill. Ports N@0 / S@0.
+ * Tunnel as a grassy hill over the straight track, big enough to fully contain a train (so the
+ * opaque hill hides it in transit — a real tunnel, no mesh culling needed), with a stone
+ * doorway at each end. Ports N@0 / S@0.
  */
 function moundTunnel(): THREE.BufferGeometry[] {
   const parts: THREE.BufferGeometry[] = [...railsForCurve(straightCurve())];
-  const hill = new THREE.SphereGeometry(1.0, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2);
-  hill.scale(1.05, 0.82, 1.12);
+  const hill = new THREE.SphereGeometry(1.0, 22, 14, 0, Math.PI * 2, 0, Math.PI / 2);
+  hill.scale(1.4, 1.55, 1.12); // half-width 1.4, height 1.55 (> train), half-length 1.12
   parts.push(paint(hill, PALETTE.grassDark));
   parts.push(...tunnelMouth(-HALF - 0.02), ...tunnelMouth(HALF + 0.02));
   return parts;

@@ -185,6 +185,11 @@ if (FOCUS && catalog[FOCUS]) {
   const centred = FOCUS === 'bridge' || FOCUS === 's-bend' || FOCUS === 'hill';
   place(catalog[FOCUS](), 0, 0, { shadow: centred ? 0 : 1.6, center: true });
   label(FOCUS, 0, centred ? -3.4 : -1.8, 2.1);
+  // prove the tunnel fits a train: a loco emerging from the mouth
+  if (FOCUS === 'tunnel') {
+    const loco = place(makeLocomotive(), 0, 1.9, { shadow: 0 });
+    loco.rotation.y = Math.PI; // face into the hill (−Z)
+  }
 } else {
   // Track pieces: a labelled grid (5 columns) — every piece visible, centred in its slot.
   const cols = 5;
