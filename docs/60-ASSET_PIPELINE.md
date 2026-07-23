@@ -105,9 +105,11 @@ curve unit tests, `src/core/curves.test.ts`).
   cylinder + hatch; flatbeds corner stakes.
 - **`makeStation(awningColor)`** — platform slab + plank cap + posts + awning + fascia +
   trackside signboard + bench. Per-biome awning tint.
-- **Props** — `makeTree` (stacked cones + trunk), `makeHouse(roof, wall)` (box + gable prism
-  + chimney + door/window), `makeLamp` (post + glowing head). These dress biomes and the
-  world-map diorama.
+- **Props** (`structures.ts` + `props.ts`) — `makeTree` (stacked cones), `makeHouse`,
+  `makeLamp`, plus biome variants: `makeRoundTree`, `makeSnowFir`, `makeCactus`, `makeRock`,
+  `makeMushroom(glowing)` (the glowing cap routes to the bloom layer). `biomes.ts` `BIOMES`
+  maps each biome id → `{ ground, accent, props[] }` — the data the game reads to dress a
+  stage's terrain (ground/accent tint props & ground, never track — docs/30 §9).
 
 **People:** no character meshes. Personas are the livery-colored carriages above plus floating
 icon billboards (§6); payoff "crowds" are icon billboards on capsule bodies (docs/60 §3.6 of

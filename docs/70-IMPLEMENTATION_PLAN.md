@@ -115,19 +115,26 @@ writes transform + biome tint via `instanceColor`. Verified: 500 straights = 1 d
 one-of-each 16-type board = 17 draw calls (tests). Lab `?view=layout` renders it.
 Remaining for a later pass: fold into the real game `scene.ts` + camera rig (M3.2).
 
-**M3.2 Camera rig + grid picking.**
-A: `src/camera/rig.ts`, `src/app/input.ts`, `src/render/picking.ts`.
-Reuse: 30 §12 input table (desktop rows), 30 §9.
-AC: orbit/pan/zoom with clamps; raycast → `CellCoord` picking with a hover highlight;
-touch pan/pinch functional (no polish).
+**M3.2 Camera rig + grid picking.** *(DONE)*
+A (exist): `src/camera/rig.ts` (`createCameraRig` — OrbitControls with clamps + builder mouse/
+touch mapping), `src/render/picking.ts` (`pickGround`/`pickCell` → `CellCoord`, hover
+highlight), `src/app/input.ts` (`attachBuildInput`: hover/place/remove/rotate/select),
+`src/render/picking.test.ts`, lab `?view=build` interactive demo.
+Reuse: 30 §12 input table, 30 §9.
+AC: orbit/pan/zoom with clamps; raycast → `CellCoord` (tested headlessly incl. sky-miss →
+null); hover highlight; left-click place / right-click remove / R rotate / 1–9 select;
+touch pan/pinch mapped.
 
-**M3.3 Meshgen polish + biome props.** *(core generators DONE in M0.2)*
-A: `src/render/meshgen/{track,structures,props}.ts` (extend), snapshot tests (geometry counts).
-Reuse: 60 §4–5, the existing generators.
-AC: bridge/tunnel/junction/crossing/station stay ≤ 2k tris of kitbash each and share the
-material; add per-biome prop variants (60 §5, 20 §1 dressing column); junction lever exposes a
-named node for the flip animation and tap target; regression test that building every piece +
-all rolling stock never throws (attribute-merge safety).
+**M3.3 Meshgen polish + biome props.** *(DONE except junction-lever animation node)*
+A (exist): `src/render/meshgen/props.ts` (round-tree, snow-fir, cactus, rock, glowing/plain
+mushroom), `src/render/meshgen/biomes.ts` (`BIOMES` dressing table: ground/accent + prop
+factories per biome), `src/render/meshgen/generators.test.ts`, lab `?view=props` showcase.
+Reuse: 60 §4–5, existing generators.
+AC: per-biome prop variants added (60 §5, 20 §1 dressing); regression test that every
+generator (16 pieces + rolling stock + structures + props + biome factories) builds a
+well-formed `{position,normal,color}` non-indexed asset and never throws. **Deferred to M6.2**
+(junction interaction): expose the junction lever as a named node for the flip animation — it
+is currently baked into the piece glow, which is right for instancing but not yet animatable.
 
 ### M4 — Train sim + physics, headless (4 tasks)
 

@@ -11,15 +11,21 @@ import { CELL, PALETTE } from '../render/meshgen/palette';
 import { ALL_PIECES, buildPiece, type PieceType } from '../render/meshgen/track';
 import { makeCarriage, makeLocomotive } from '../render/meshgen/rollingstock';
 import { makeHouse, makeLamp, makeStation, makeTree } from '../render/meshgen/structures';
+import { makeCactus, makeMushroom, makeRock, makeRoundTree, makeSnowFir } from '../render/meshgen/props';
+import { BIOMES } from '../render/meshgen/biomes';
 import type { Asset } from '../render/meshgen/asset';
 import { BLOOM_LAYER, makeBloom } from '../render/postfx';
 import { buildLayout } from './layout';
+import { buildDemo } from './build';
+import { createCameraRig } from '../camera/rig';
 
 const params = new URLSearchParams(location.search);
 const SPIN = params.get('spin') === '1';
 const WIRE = params.get('wire') === '1';
 const FOCUS = params.get('focus');
 const LAYOUT = params.get('view') === 'layout';
+const BUILD = params.get('view') === 'build';
+const PROPS = params.get('view') === 'props';
 
 const canvas = document.getElementById('app') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -169,6 +175,11 @@ const catalog: Record<string, () => Asset> = {
   tree: () => makeTree(),
   house: () => makeHouse(),
   lamp: () => makeLamp(),
+  'round-tree': () => makeRoundTree(),
+  'snow-fir': () => makeSnowFir(),
+  cactus: () => makeCactus(),
+  rock: () => makeRock(),
+  mushroom: () => makeMushroom(true),
 };
 for (const p of ALL_PIECES) catalog[p] = () => buildPiece(p);
 
@@ -184,9 +195,31 @@ function waterPatch(w: number, d: number, x: number, z: number): void {
 
 let layoutStats: { pieces: number; drawCalls: number } | null = null;
 
+/** A thin biome-tinted ground patch for the props showcase. */
+function groundPatch(color: THREE.ColorRepresentation, x: number, z: number, w: number, d: number): void {
+  const m = new THREE.Mesh(
+    new THREE.BoxGeometry(w, 0.06, d),
+    new THREE.MeshStandardMaterial({ color, roughness: 1 }),
+  );
+  m.position.set(x, 0.01, z);
+  m.receiveShadow = true;
+  scene.add(m);
+}
+
 if (LAYOUT) {
   // Instanced track demo: a whole board drawn in a handful of draw calls.
   layoutStats = buildLayout(scene);
+} else if (BUILD) {
+  // interactive placement demo — scene content added after the camera is ready
+} else if (PROPS) {
+  // Biome dressing: each biome's procedural props on its tinted ground.
+  Object.keys(BIOMES).forEach((id, i) => {
+    const b = BIOMES[id];
+    const z = i * 3.4;
+    groundPatch(b.ground, 0, z, 13, 3);
+    b.props.forEach((make, j) => place(make(), -3.5 + j * 2.4, z, { shadow: 0.9 }));
+    label(id, -5.6, z, 1.5);
+  });
 } else if (FOCUS && catalog[FOCUS]) {
   // single-mesh inspection mode (long pieces are centred so they frame nicely)
   if (FOCUS === 'bridge') waterPatch(3.4, 3.2, 0, 0); // gap the span crosses
@@ -237,7 +270,9 @@ if (LAYOUT) {
 // camera + controls
 const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 200);
 camera.layers.enableAll();
-const controls = new OrbitControls(camera, renderer.domElement);
+const controls = BUILD
+  ? createCameraRig(camera, renderer.domElement, { minDistance: 6, maxDistance: 80 })
+  : new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
 const views: Record<string, { pos: [number, number, number]; target: [number, number, number] }> = {
@@ -248,6 +283,8 @@ const views: Record<string, { pos: [number, number, number]; target: [number, nu
   town: { pos: [-1, 5, 19], target: [-1, 0.4, 11] },
   focus: { pos: [3.4, 2.4, 3.8], target: [0, 0.7, 0] },
   layout: { pos: [13, 15, 27], target: [13, 0, 3] },
+  build: { pos: [3, 9, 12], target: [3, 0, 2] },
+  props: { pos: [0, 11, 20], target: [0, 0, 7] },
 };
 const view = FOCUS ? 'focus' : (params.get('view') ?? 'overview');
 const v = views[view] ?? views.overview;
@@ -278,6 +315,9 @@ window.addEventListener('resize', () => {
 window.addEventListener('keydown', (e) => {
   if (e.key === 'w') bodyMaterial.wireframe = !bodyMaterial.wireframe;
 });
+
+// interactive build demo (rig + picking + input + instancing) — set up last, after camera
+if (BUILD) buildDemo(scene, camera, renderer.domElement);
 
 let rendered = 0;
 const clock = new THREE.Clock();
