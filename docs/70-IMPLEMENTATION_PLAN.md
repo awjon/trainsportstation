@@ -62,7 +62,7 @@ V: `npm run dev` serves the app; CI green on the branch.
 A (exist): `src/core/{math,curves}.ts`, `src/render/meshgen/{palette,sweep,track,rollingstock,structures}.ts`,
 `src/lab/main.ts`, `src/core/curves.test.ts`.
 Reuse: 60 (procedural spec), 30 §6 curves.
-AC: `buildPiece` generates all 10 `PieceType`s; `makeLocomotive`/`makeCarriage`/`makeStation`
+AC: `buildPiece` generates all 14 `PieceType`s; `makeLocomotive`/`makeCarriage`/`makeStation`
 + props build without throwing; one shared vertex-color material; curve endpoint tests green;
 the asset lab renders the full set. This module is the basis M3 builds instancing on.
 V: `npm run test` green; `npm run build` green; asset lab screenshots render all pieces.
@@ -87,7 +87,7 @@ pausable/single-steppable (assist mode + tests need this).
 **M2.1 Piece definitions.**
 A: `data/pieces.json`, `src/track/pieces.ts` + tests.
 Reuse: 30 §4 `PieceDef`, 30 §5 port table (the data), 60 §4 meshgen builder keys.
-AC: all 10 `PieceType`s defined; T-1 rotation round-trip; T-2 port table fixture equality.
+AC: all 14 `PieceType`s defined; T-1 rotation round-trip; T-2 port table fixture equality.
 
 **M2.2 Placement + validation.**
 A: `src/track/placement.ts` + tests.

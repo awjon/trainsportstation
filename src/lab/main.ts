@@ -95,23 +95,33 @@ function place(
   asset: Asset,
   x: number,
   z: number,
-  opts: { shadow?: number; rotY?: number } = {},
+  opts: { shadow?: number; rotY?: number; center?: boolean } = {},
 ): THREE.Object3D {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   if (opts.rotY) group.rotation.y = opts.rotY;
 
+  const inner = new THREE.Group();
+  if (opts.center) {
+    // shift so the piece's horizontal footprint centre sits on (x,z) — keeps long pieces
+    // (bridge, s-bend, hill) from overrunning their grid slot.
+    asset.body.computeBoundingBox();
+    const bb = asset.body.boundingBox!;
+    inner.position.set(-(bb.min.x + bb.max.x) / 2, 0, -(bb.min.z + bb.max.z) / 2);
+  }
+  group.add(inner);
+
   const bodyMesh = new THREE.Mesh(asset.body, bodyMaterial);
-  group.add(bodyMesh);
+  inner.add(bodyMesh);
   triangles += asset.body.getAttribute('position').count / 3;
 
   if (asset.glow) {
     const glowMesh = new THREE.Mesh(asset.glow, glowMaterial);
     glowMesh.layers.enable(BLOOM_LAYER);
-    group.add(glowMesh);
+    inner.add(glowMesh);
     triangles += asset.glow.getAttribute('position').count / 3;
   }
-  if (opts.shadow) addShadow(group, opts.shadow);
+  if (opts.shadow) addShadow(inner, opts.shadow);
 
   scene.add(group);
   spinners.push(group);
@@ -120,22 +130,28 @@ function place(
 
 function label(text: string, x: number, z: number, y = 1.7): void {
   const c = document.createElement('canvas');
-  c.width = 256;
+  c.width = 384;
   c.height = 64;
   const ctx = c.getContext('2d')!;
-  ctx.font = 'bold 34px system-ui, sans-serif';
+  // shrink the font until the label fits the canvas width (long names like curve-large-ramp)
+  let fontSize = 34;
+  do {
+    ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
+    if (ctx.measureText(text).width <= c.width - 16) break;
+    fontSize -= 2;
+  } while (fontSize > 16);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineWidth = 6;
   ctx.strokeStyle = 'rgba(255,255,255,0.92)';
-  ctx.strokeText(text, 128, 34);
+  ctx.strokeText(text, c.width / 2, 34);
   ctx.fillStyle = '#243038';
-  ctx.fillText(text, 128, 34);
+  ctx.fillText(text, c.width / 2, 34);
   const tex = new THREE.CanvasTexture(c);
   tex.anisotropy = 4;
   const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
   spr.position.set(x, y, z);
-  spr.scale.set(2.2, 0.55, 1);
+  spr.scale.set(3.3, 0.55, 1);
   scene.add(spr);
 }
 
@@ -153,23 +169,38 @@ const catalog: Record<string, () => Asset> = {
 };
 for (const p of ALL_PIECES) catalog[p] = () => buildPiece(p);
 
+/** A flat water patch (generated box, no texture) for the bridge diorama. */
+function waterPatch(w: number, d: number, x: number, z: number): void {
+  const m = new THREE.Mesh(
+    new THREE.BoxGeometry(w, 0.1, d),
+    new THREE.MeshStandardMaterial({ color: PALETTE.water, roughness: 0.35, metalness: 0.1 }),
+  );
+  m.position.set(x, 0.03, z);
+  scene.add(m);
+}
+
 if (FOCUS && catalog[FOCUS]) {
-  // single-mesh inspection mode
-  place(catalog[FOCUS](), 0, 0, { shadow: 1.6 });
-  label(FOCUS, 0, -1.6, 1.9);
+  // single-mesh inspection mode (long pieces are centred so they frame nicely)
+  if (FOCUS === 'bridge') waterPatch(3.4, 3.2, 0, 0); // gap the span crosses
+  const centred = FOCUS === 'bridge' || FOCUS === 's-bend' || FOCUS === 'hill';
+  place(catalog[FOCUS](), 0, 0, { shadow: centred ? 0 : 1.6, center: true });
+  label(FOCUS, 0, centred ? -3.4 : -1.8, 2.1);
 } else {
-  // Row 1: all 10 track pieces
-  const trackZ = -6;
-  const spacing = CELL * 1.9;
-  const startX = (-(ALL_PIECES.length - 1) * spacing) / 2;
+  // Track pieces: a labelled grid (5 columns) — every piece visible, centred in its slot.
+  const cols = 5;
+  const sx = 4.2;
+  const sz = 4.6;
   ALL_PIECES.forEach((p: PieceType, i) => {
-    const x = startX + i * spacing;
-    place(buildPiece(p), x, trackZ, { shadow: 1.5 });
-    label(p, x, trackZ - CELL * 0.9, 1.5);
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const x = (col - (cols - 1) / 2) * sx;
+    const z = -2 - row * sz;
+    place(buildPiece(p), x, z, { shadow: 1.4, center: true });
+    label(p, x, z - 2.0, 1.3);
   });
 
-  // Row 2: rolling stock
-  const stockZ = -1;
+  // Rolling stock (in front of the grid)
+  const stockZ = 7;
   place(makeLocomotive(), -6.5, stockZ, { shadow: 1.4 });
   place(makeCarriage('passenger', PALETTE.commuter), -4.6, stockZ, { shadow: 1.2 });
   place(makeCarriage('container', PALETTE.kid), -2.7, stockZ, { shadow: 1.2 });
@@ -177,17 +208,17 @@ if (FOCUS && catalog[FOCUS]) {
   place(makeCarriage('flatbed', PALETTE.engineer), 1.1, stockZ, { shadow: 1.2 });
   place(makeCarriage('passenger', PALETTE.elder), 3.0, stockZ, { shadow: 1.2 });
   place(makeCarriage('container', PALETTE.musician), 4.9, stockZ, { shadow: 1.2 });
-  label('locomotive + persona carriages', -0.8, stockZ - 1.5, 1.9);
+  label('locomotive + persona carriages', -0.8, stockZ - 1.6, 1.9);
 
-  // Row 3: station + props
-  const townZ = 4;
+  // Station + props (front-most)
+  const townZ = 11;
   place(makeStation(), -5, townZ, { shadow: 1.8 });
-  label('station', -5, townZ - 1.7, 1.9);
+  label('station', -5, townZ - 1.8, 1.9);
   place(makeTree(), -1.5, townZ, { shadow: 0.9 });
   place(makeTree(), -0.4, townZ + 0.6, { shadow: 0.9 });
   place(makeHouse(), 1.6, townZ, { shadow: 1.2, rotY: Math.PI * 0.15 });
   place(makeLamp(), 3.6, townZ, { shadow: 0.6 });
-  label('props: tree · house · lamp', 1.4, townZ - 1.7, 1.9);
+  label('props: tree · house · lamp', 1.4, townZ - 1.8, 1.9);
 }
 
 // camera + controls
@@ -197,12 +228,12 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
 const views: Record<string, { pos: [number, number, number]; target: [number, number, number] }> = {
-  overview: { pos: [0, 12, 16], target: [0, 0.4, -2] },
-  track: { pos: [0, 16, 0.01], target: [0, 0, -6] },
-  trackPersp: { pos: [-2, 6, 3], target: [-2, 0.3, -6] },
-  stock: { pos: [-1, 4.5, 7], target: [-1, 0.6, -1] },
-  town: { pos: [-1, 5, 12], target: [-1, 0.4, 4] },
-  focus: { pos: [2.6, 2.0, 3.0], target: [0, 0.7, 0] },
+  overview: { pos: [0, 15, 22], target: [0, 0.4, -1] },
+  pieces: { pos: [0, 22, 6], target: [0, 0, -6.5] }, // high angle over the whole piece grid
+  track: { pos: [0, 24, -6], target: [0, 0, -6.5] }, // top-down piece grid
+  stock: { pos: [-1, 4.5, 14], target: [-1, 0.6, 7] },
+  town: { pos: [-1, 5, 19], target: [-1, 0.4, 11] },
+  focus: { pos: [3.4, 2.4, 3.8], target: [0, 0.7, 0] },
 };
 const view = FOCUS ? 'focus' : (params.get('view') ?? 'overview');
 const v = views[view] ?? views.overview;

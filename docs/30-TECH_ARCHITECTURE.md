@@ -104,7 +104,8 @@ export interface CellCoord { x: number; z: number }   // integer grid coords, x�
 
 // track/pieces.ts — one PieceDef per PieceType, loaded from data/pieces.json
 export type PieceType =
-  | 'straight' | 'curve-small' | 'curve-large' | 'ramp' | 'hill'
+  | 'straight' | 'curve-small' | 'curve-large' | 's-bend' | 'skew'
+  | 'ramp' | 'curve-small-ramp' | 'curve-large-ramp' | 'hill'
   | 'bump' | 'bridge' | 'tunnel' | 'junction' | 'crossing';
 
 export interface Port { cell: CellCoord; edge: Direction; height: HeightLevel } // piece-local
@@ -205,8 +206,9 @@ type-check and validate).
   `render/meshgen/palette.ts`; all piece paths and geometry are authored in world units around
   a cell centered at the origin (60 §3).
 - Terrain per cell: `height: HeightLevel` and optional feature `water | rock | forest | town`.
-  Track requires port `height` to match terrain height unless the piece is `elevated` (bridge)
-  or `covered` (tunnel, which requires `rock`/hill terrain above).
+  Track requires port `height` to match terrain height unless the piece is `elevated` (bridge —
+  brings its own approach ramps + deck) or `covered` (tunnel — brings its own mound; may also be
+  placed under existing `rock`/hill terrain).
 - **Placement validity** (all must hold): footprint cells in bounds; footprint cells not
   occupied by another placement, a station, or blocking terrain (`water`/`rock` unless
   bridge/tunnel); every piece port that touches an occupied neighbor edge must align with a
@@ -234,13 +236,24 @@ Port table (piece-local, rotation 0; heights 0 unless noted):
 | straight | (0,0) | N(0,0), S(0,0) |
 | curve-small | (0,0) | N(0,0), E(0,0) |
 | curve-large | (0,0)(1,0)(0,1)(1,1) | N(0,0), E(1,1) |
+| s-bend | (0,0)(0,1)(1,0)(1,1) | N(0,0)@0, S(1,1)@0 (lateral shift +1 cell; ports provisional until M2) |
+| skew | (0,0)(1,0) | N(0,0)@0, S(1,0)@0 (sharp lane change +1 cell; ports provisional until M2) |
 | ramp | (0,0) | N(0,0)@h, S(0,0)@h+1 |
+| curve-small-ramp | (0,0) | N(0,0)@h, E(0,0)@h+1 (turns and climbs one level) |
+| curve-large-ramp | (0,0)(1,0)(0,1)(1,1) | N(0,0)@h, E(1,1)@h+1 (wide turn + climb) |
 | hill | (0,0)(0,1) | N(0,0)@0, S(0,1)@0 (path rises over a bump, `jumpCapable`) |
 | bump | (0,0) | N(0,0), S(0,0) (`jumpCapable`) |
-| bridge | (0,0) | N(0,0)@1, S(0,0)@1 (`elevated`; legal over water/track) |
-| tunnel | (0,0) | N(0,0)@0, S(0,0)@0 (`covered`; legal only through rock/hill cell) |
+| bridge | (0,0)(0,1)(0,2) | N(0,0)@0, S(0,2)@0 (`elevated`; integral ramps up to a height-1 deck; crosses water/track in the middle cell) |
+| tunnel | (0,0) | N(0,0)@0, S(0,0)@0 (`covered`; a mound with a portal at each end — track passes through) |
 | junction | (0,0) | N(0,0), S(0,0), E(0,0) (`switch`; paths N↔S, N↔E) |
 | crossing | (0,0) | N,S,E,W (paths N↔S, E↔W, independent) |
+
+Piece function reference: **straight/curve-small/curve-large** route on the flat;
+**s-bend/skew** shift a line sideways by one lane; **ramp/curve-small-ramp/curve-large-ramp**
+change height by one level (straight or while turning); **hill/bump** rise and fall over their
+span (`jumpCapable`); **bridge** carries a line up-and-over a water/track gap via integral
+approach ramps; **tunnel** carries a line through a hill; **junction** is a switchable Y;
+**crossing** lets two lines cross at 90° without connecting.
 
 ## 6. Splines and train movement
 

@@ -14,7 +14,11 @@ export type PieceType =
   | 'straight'
   | 'curve-small'
   | 'curve-large'
+  | 's-bend'
+  | 'skew'
   | 'ramp'
+  | 'curve-small-ramp'
+  | 'curve-large-ramp'
   | 'hill'
   | 'bump'
   | 'bridge'
@@ -117,34 +121,89 @@ function hillCurve(): Curve {
 function bumpCurve(): Curve {
   return catmullCurve([vec(0, 0, -HALF), vec(0, 0.42, 0), vec(0, 0, HALF)]);
 }
+// curved inclines: same arcs as the flat curves, but climbing one height level (N@0 → E@+1)
+function curveSmallRampCurve(): Curve {
+  return arcCurve(vec(HALF, 0, -HALF), vec(0, 0, -HALF), -Math.PI / 2, HEIGHT_UNIT);
+}
+function curveLargeRampCurve(): Curve {
+  return arcCurve(vec(1.5 * CELL, 0, -HALF), vec(0, 0, -HALF), -Math.PI / 2, HEIGHT_UNIT);
+}
+// s-bend: a gentle 2-cell lateral shift (+1 cell in x), entering and leaving heading +Z
+function sBendCurve(): Curve {
+  return catmullCurve([vec(0, 0, -HALF), vec(0, 0, HALF), vec(CELL, 0, CELL), vec(CELL, 0, 1.5 * CELL)]);
+}
+// skew: a sharper single-cell lane change (+1 cell in x over one cell of length)
+function skewCurve(): Curve {
+  return catmullCurve([
+    vec(0, 0, -HALF),
+    vec(0, 0, -HALF + 0.25),
+    vec(CELL, 0, HALF - 0.25),
+    vec(CELL, 0, HALF),
+  ]);
+}
 
 // --- kitbash extras ---
 
-function trestleLegs(curve: Curve): THREE.BufferGeometry[] {
-  const parts: THREE.BufferGeometry[] = [];
-  const frames = sampleFrames(curve, 6);
-  for (let i = 1; i < frames.length - 1; i += 2) {
-    const f = frames[i];
-    const legY = f.position.y + RAIL_Y - 0.19;
-    const h = legY; // down to base
-    parts.push(box(0.16, h, 0.16, PALETTE.wood, [f.position.x - GAUGE / 2, legY - h / 2, f.position.z]));
-    parts.push(box(0.16, h, 0.16, PALETTE.wood, [f.position.x + GAUGE / 2, legY - h / 2, f.position.z]));
-    parts.push(box(GAUGE + 0.3, 0.12, 0.14, PALETTE.wood, [f.position.x, legY - h + 0.2, f.position.z]));
+/**
+ * Bridge as a self-contained span: ramp up → railed deck at height 1 → ramp down, with
+ * stone piers and abutments, over a 3-cell N-S footprint. Ports N@0 / S@0 (drops between two
+ * ground tracks and carries them over a water gap). The lab shows it over a water strip.
+ */
+function bridgeSpan(): THREE.BufferGeometry[] {
+  const H = HEIGHT_UNIT;
+  const zDeckStart = HALF; // z=1
+  const zDeckEnd = 1.5 * CELL; // z=3
+  const zEnd = 2.5 * CELL; // z=5 (three cells long)
+  const zc = (zDeckStart + zDeckEnd) / 2; // deck center
+  const deckLen = zDeckEnd - zDeckStart;
+
+  const parts: THREE.BufferGeometry[] = [
+    ...railsForCurve(lineCurve(vec(0, 0, -HALF), vec(0, H, zDeckStart)), { ballast: false }),
+    ...railsForCurve(lineCurve(vec(0, H, zDeckStart), vec(0, H, zDeckEnd)), { ballast: false }),
+    ...railsForCurve(lineCurve(vec(0, H, zDeckEnd), vec(0, 0, zEnd)), { ballast: false }),
+  ];
+
+  // side railings + posts along the deck
+  const railX = GAUGE / 2 + 0.18;
+  for (const sx of [-1, 1]) {
+    parts.push(box(0.07, 0.34, deckLen, PALETTE.wood, [sx * railX, H + RAIL_Y + 0.22, zc]));
+    for (const z of [zDeckStart, zc, zDeckEnd]) {
+      parts.push(box(0.1, 0.4, 0.1, PALETTE.wood, [sx * railX, H + RAIL_Y + 0.1, z]));
+    }
   }
+
+  // stone piers under the deck ends + abutments at the ramp feet
+  const pierTop = H + RAIL_Y - 0.19;
+  for (const z of [zDeckStart, zDeckEnd]) {
+    parts.push(box(GAUGE + 0.5, pierTop, 0.3, PALETTE.stone, [0, pierTop / 2, z]));
+  }
+  parts.push(box(GAUGE + 0.5, 0.3, 0.5, PALETTE.stone, [0, 0.15, -HALF + 0.12]));
+  parts.push(box(GAUGE + 0.5, 0.3, 0.5, PALETTE.stone, [0, 0.15, zEnd - 0.12]));
   return parts;
 }
 
-function portalArch(z: number): THREE.BufferGeometry[] {
-  const parts: THREE.BufferGeometry[] = [];
-  const w = GAUGE + 0.9;
-  const postH = 1.1;
-  parts.push(box(0.22, postH, 0.3, PALETTE.stone, [-w / 2, postH / 2, z]));
-  parts.push(box(0.22, postH, 0.3, PALETTE.stone, [w / 2, postH / 2, z]));
-  // arch top (a few angled boxes to fake a rounded portal)
-  const ring = new THREE.TorusGeometry(w / 2, 0.16, 6, 12, Math.PI);
-  ring.rotateY(Math.PI / 2);
-  ring.translate(0, postH, z);
-  parts.push(paint(ring, PALETTE.stone));
+/** A stone tunnel mouth: a doorway frame with a dark opening, set into the hillside. */
+function tunnelMouth(z: number): THREE.BufferGeometry[] {
+  const w = GAUGE + 0.5; // ~1.2
+  const h = 0.82;
+  return [
+    box(0.18, h, 0.3, PALETTE.stone, [-w / 2, h / 2, z]), // jambs
+    box(0.18, h, 0.3, PALETTE.stone, [w / 2, h / 2, z]),
+    box(w + 0.36, 0.2, 0.34, PALETTE.stone, [0, h + 0.08, z]), // lintel
+    box(w - 0.06, h - 0.06, 0.08, PALETTE.chimney, [0, (h - 0.06) / 2, z]), // dark opening
+  ];
+}
+
+/**
+ * Tunnel as a low grassy hill over the straight track, with a stone doorway at each end so the
+ * track clearly passes *through* the hill. Ports N@0 / S@0.
+ */
+function moundTunnel(): THREE.BufferGeometry[] {
+  const parts: THREE.BufferGeometry[] = [...railsForCurve(straightCurve())];
+  const hill = new THREE.SphereGeometry(1.0, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+  hill.scale(1.05, 0.82, 1.12);
+  parts.push(paint(hill, PALETTE.grassDark));
+  parts.push(...tunnelMouth(-HALF - 0.02), ...tunnelMouth(HALF + 0.02));
   return parts;
 }
 
@@ -174,8 +233,20 @@ export function buildPiece(type: PieceType): Asset {
     case 'curve-large':
       body = railsForCurve(curveLarge(), { segments: 36 });
       break;
+    case 's-bend':
+      body = railsForCurve(sBendCurve(), { segments: 40 });
+      break;
+    case 'skew':
+      body = railsForCurve(skewCurve(), { segments: 32 });
+      break;
     case 'ramp':
       body = railsForCurve(rampCurve());
+      break;
+    case 'curve-small-ramp':
+      body = railsForCurve(curveSmallRampCurve());
+      break;
+    case 'curve-large-ramp':
+      body = railsForCurve(curveLargeRampCurve(), { segments: 36 });
       break;
     case 'hill':
       body = railsForCurve(hillCurve(), { segments: 40 });
@@ -184,15 +255,10 @@ export function buildPiece(type: PieceType): Asset {
       body = railsForCurve(bumpCurve());
       break;
     case 'bridge':
-      body = [
-        ...railsForCurve(lineCurve(vec(0, HEIGHT_UNIT, -HALF), vec(0, HEIGHT_UNIT, HALF)), {
-          ballast: false,
-        }),
-        ...trestleLegs(lineCurve(vec(0, HEIGHT_UNIT, -HALF), vec(0, HEIGHT_UNIT, HALF))),
-      ];
+      body = bridgeSpan();
       break;
     case 'tunnel':
-      body = [...railsForCurve(straightCurve()), ...portalArch(-HALF + 0.15), ...portalArch(HALF - 0.15)];
+      body = moundTunnel();
       break;
     case 'junction': {
       const lever = leverPost();
@@ -219,7 +285,11 @@ export const ALL_PIECES: PieceType[] = [
   'straight',
   'curve-small',
   'curve-large',
+  's-bend',
+  'skew',
   'ramp',
+  'curve-small-ramp',
+  'curve-large-ramp',
   'hill',
   'bump',
   'bridge',

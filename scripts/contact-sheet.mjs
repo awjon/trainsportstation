@@ -10,15 +10,32 @@ const BASE = process.env.BASE_URL ?? 'http://localhost:4178';
 const OUT = process.env.OUT ?? 'lab-shots';
 mkdirSync(OUT, { recursive: true });
 
+const PIECES = [
+  'straight',
+  'curve-small',
+  'curve-large',
+  's-bend',
+  'skew',
+  'ramp',
+  'curve-small-ramp',
+  'curve-large-ramp',
+  'hill',
+  'bump',
+  'bridge',
+  'tunnel',
+  'junction',
+  'crossing',
+];
+
 const shots = [
   { name: 'overview', q: 'view=overview' },
-  { name: 'track', q: 'view=track' },
+  { name: 'pieces', q: 'view=pieces' },
+  { name: 'pieces-topdown', q: 'view=track' },
   { name: 'stock', q: 'view=stock' },
   { name: 'town', q: 'view=town' },
+  ...PIECES.map((p) => ({ name: `piece-${p}`, q: `focus=${p}` })),
   { name: 'focus-locomotive', q: 'focus=locomotive' },
   { name: 'focus-station', q: 'focus=station' },
-  { name: 'focus-junction', q: 'focus=junction' },
-  { name: 'focus-carriage-passenger', q: 'focus=carriage-passenger' },
 ];
 
 const browser = await chromium.launch({

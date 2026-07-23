@@ -66,20 +66,24 @@ Reference implementation for everything in this doc already exists under
 
 ## 4. Track generation (`track.ts`)
 
-`buildPiece(type: PieceType): THREE.BufferGeometry` returns one merged, painted geometry per
-piece, built from a piece-local `Curve` plus rails/ties/ballast and any kitbash extras:
+`buildPiece(type: PieceType): Asset` returns a shaded body (+ optional glow) per piece, built
+from a piece-local `Curve` plus rails/ties/ballast and any kitbash extras:
 
 | PieceType | Curve | Extras |
 |---|---|---|
 | `straight` | line N→S | ballast + ties |
 | `curve-small` | quarter arc N→E, r = CELL/2 | ballast + ties |
 | `curve-large` | quarter arc N→E, r = 1.5·CELL (2×2 footprint) | ballast + ties |
+| `s-bend` | catmull S, +1 cell lateral over 2 cells | ballast + ties |
+| `skew` | catmull sharp lane change, +1 cell over ~1 cell | ballast + ties |
 | `ramp` | line rising `HEIGHT_UNIT` over one cell | ballast + ties |
+| `curve-small-ramp` | quarter arc N→E rising `HEIGHT_UNIT` (`arcCurve` yEnd) | ballast + ties |
+| `curve-large-ramp` | wide quarter arc rising `HEIGHT_UNIT` (2×2) | ballast + ties |
 | `hill` | catmull crest over 2 cells (`jumpCapable`) | ballast + ties |
 | `bump` | short catmull crest, 1 cell (`jumpCapable`) | ballast + ties |
-| `bridge` | line at `HEIGHT_UNIT` | rail-only + procedural trestle legs/braces |
-| `tunnel` | line N→S at ground | two stone portal arches (half-torus + posts) |
-| `junction` | line N→S + arc N→E sharing the N port | lever post (tap target, docs/30 §5) |
+| `bridge` | ramp-up → deck at `HEIGHT_UNIT` → ramp-down (3 cells) | wood railings/posts + stone piers & abutments; shown over water |
+| `tunnel` | line N→S at ground | grassy mound (hemisphere) + a stone portal at each end |
+| `junction` | line N→S + arc N→E sharing the N port | lever post + glowing signal (bloom) |
 | `crossing` | line N→S + line W→E | plank deck plate at the shared cell |
 
 Rails: two swept `boxProfile` rails at ±gauge/2; ballast: a swept low wide bed; ties:
