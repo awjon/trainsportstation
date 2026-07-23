@@ -4,7 +4,7 @@
 // (docs/70 M3.1) body and glow become two InstancedMesh layers.
 
 import * as THREE from 'three';
-import { merge } from './sweep';
+import { merge, mirrorX } from './sweep';
 import { finalizeAsset } from './shading';
 
 export interface Asset {
@@ -19,6 +19,11 @@ export function buildAsset(bodyParts: THREE.BufferGeometry[], glowParts: THREE.B
     body: finalizeAsset(merge(bodyParts)),
     glow: glowParts.length ? merge(glowParts) : null,
   };
+}
+
+/** The handed opposite of an asset (mirror across X) — e.g. a left s-bend from a right one. */
+export function mirrorAssetX(a: Asset): Asset {
+  return { body: mirrorX(a.body), glow: a.glow ? mirrorX(a.glow) : null };
 }
 
 /** Triangle count of an Asset (body + glow), for budget tests. */

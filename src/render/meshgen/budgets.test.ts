@@ -65,3 +65,19 @@ describe('emissive routing', () => {
     expect(buildPiece('straight').glow).toBeNull();
   });
 });
+
+describe('mirrored variants', () => {
+  it('s-bend-left is the X-mirror of s-bend (same tri count, negated X bounds)', () => {
+    const right = buildPiece('s-bend').body;
+    const left = buildPiece('s-bend-left').body;
+    right.computeBoundingBox();
+    left.computeBoundingBox();
+    // same triangle count
+    expect(left.getAttribute('position').count).toBe(right.getAttribute('position').count);
+    // X bounds are mirrored: left.min.x ≈ -right.max.x
+    expect(left.boundingBox!.min.x).toBeCloseTo(-right.boundingBox!.max.x, 4);
+    expect(left.boundingBox!.max.x).toBeCloseTo(-right.boundingBox!.min.x, 4);
+    // Z/Y unchanged by an X mirror
+    expect(left.boundingBox!.min.z).toBeCloseTo(right.boundingBox!.min.z, 4);
+  });
+});

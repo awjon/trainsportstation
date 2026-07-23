@@ -119,6 +119,39 @@ export function merge(geometries: THREE.BufferGeometry[]): THREE.BufferGeometry 
   return merged;
 }
 
+/**
+ * Mirror a (non-indexed) geometry across the X axis, producing the handed opposite of a piece.
+ * Negates X on every vertex, then swaps two vertices of each triangle to correct the winding,
+ * and recomputes normals. Colors travel with their vertices; baked shading (from Y / normal.y)
+ * is unaffected by an X mirror, so it stays valid.
+ */
+export function mirrorX(src: THREE.BufferGeometry): THREE.BufferGeometry {
+  const g = src.clone();
+  const pos = g.getAttribute('position') as THREE.BufferAttribute;
+  const parr = pos.array as Float32Array;
+  const col = g.getAttribute('color') as THREE.BufferAttribute | undefined;
+  const carr = col?.array as Float32Array | undefined;
+  for (let i = 0; i < pos.count; i++) parr[i * 3] = -parr[i * 3]; // negate X
+  const swap = (a: number, b: number, arr: Float32Array) => {
+    for (let k = 0; k < 3; k++) {
+      const ia = a * 3 + k;
+      const ib = b * 3 + k;
+      const t = arr[ia];
+      arr[ia] = arr[ib];
+      arr[ib] = t;
+    }
+  };
+  for (let t = 0; t + 2 < pos.count; t += 3) {
+    swap(t + 1, t + 2, parr);
+    if (carr) swap(t + 1, t + 2, carr);
+  }
+  pos.needsUpdate = true;
+  if (col) col.needsUpdate = true;
+  g.deleteAttribute('normal');
+  g.computeVertexNormals();
+  return g;
+}
+
 /** Colored primitive helpers (rolling stock, props) sharing the vertex-color material. */
 export function box(
   w: number,

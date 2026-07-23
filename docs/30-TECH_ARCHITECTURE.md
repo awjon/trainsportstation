@@ -104,7 +104,8 @@ export interface CellCoord { x: number; z: number }   // integer grid coords, x�
 
 // track/pieces.ts — one PieceDef per PieceType, loaded from data/pieces.json
 export type PieceType =
-  | 'straight' | 'curve-small' | 'curve-large' | 's-bend' | 'skew'
+  | 'straight' | 'curve-small' | 'curve-large'
+  | 's-bend' | 's-bend-left' | 'skew' | 'skew-left'
   | 'ramp' | 'curve-small-ramp' | 'curve-large-ramp' | 'hill'
   | 'bump' | 'bridge' | 'tunnel' | 'junction' | 'crossing';
 
@@ -236,8 +237,10 @@ Port table (piece-local, rotation 0; heights 0 unless noted):
 | straight | (0,0) | N(0,0), S(0,0) |
 | curve-small | (0,0) | N(0,0), E(0,0) |
 | curve-large | (0,0)(1,0)(0,1)(1,1) | N(0,0), E(1,1) |
-| s-bend | (0,0)(0,1)(1,0)(1,1) | N(0,0)@0, S(1,1)@0 (lateral shift +1 cell; ports provisional until M2) |
-| skew | (0,0)(1,0) | N(0,0)@0, S(1,0)@0 (sharp lane change +1 cell; ports provisional until M2) |
+| s-bend | (0,0)(0,1)(1,0)(1,1) | N(0,0)@0, S(1,1)@0 (lateral shift +1 cell right; ports provisional until M2) |
+| s-bend-left | (0,0)(0,1)(1,0)(1,1) | mirror of s-bend (shift −1 cell left) |
+| skew | (0,0)(1,0) | N(0,0)@0, S(1,0)@0 (sharp lane change +1 cell right; ports provisional until M2) |
+| skew-left | (0,0)(1,0) | mirror of skew (shift left) |
 | ramp | (0,0) | N(0,0)@h, S(0,0)@h+1 |
 | curve-small-ramp | (0,0) | N(0,0)@h, E(0,0)@h+1 (turns and climbs one level) |
 | curve-large-ramp | (0,0)(1,0)(0,1)(1,1) | N(0,0)@h, E(1,1)@h+1 (wide turn + climb) |
@@ -248,8 +251,14 @@ Port table (piece-local, rotation 0; heights 0 unless noted):
 | junction | (0,0) | N(0,0), S(0,0), E(0,0) (`switch`; paths N↔S, N↔E) |
 | crossing | (0,0) | N,S,E,W (paths N↔S, E↔W, independent) |
 
+Turn direction: 90° curves (flat and ramped) need no mirror — their four rotations already give
+both left and right turns (N–E, E–S, S–W, W–N), and a train runs a piece in either direction
+(so a ramp is both an incline and a decline). Only the chiral pieces are handed: hence
+**s-bend/s-bend-left** and **skew/skew-left** (mirror pairs).
+
 Piece function reference: **straight/curve-small/curve-large** route on the flat;
-**s-bend/skew** shift a line sideways by one lane; **ramp/curve-small-ramp/curve-large-ramp**
+**s-bend/skew** (+ their `-left` mirrors) shift a line sideways by one lane;
+**ramp/curve-small-ramp/curve-large-ramp**
 change height by one level (straight or while turning); **hill/bump** rise and fall over their
 span (`jumpCapable`); **bridge** carries a line up-and-over a water/track gap via integral
 approach ramps; **tunnel** carries a line through a hill; **junction** is a switchable Y;

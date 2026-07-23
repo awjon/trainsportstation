@@ -8,14 +8,16 @@ import { arcCurve, catmullCurve, lineCurve, sampleFrames, type Curve } from '../
 import { vec } from '../../core/math';
 import { CELL, HEIGHT_UNIT, PALETTE } from './palette';
 import { box, boxProfile, paint, sweepProfile } from './sweep';
-import { buildAsset, type Asset } from './asset';
+import { buildAsset, mirrorAssetX, type Asset } from './asset';
 
 export type PieceType =
   | 'straight'
   | 'curve-small'
   | 'curve-large'
   | 's-bend'
+  | 's-bend-left'
   | 'skew'
+  | 'skew-left'
   | 'ramp'
   | 'curve-small-ramp'
   | 'curve-large-ramp'
@@ -241,9 +243,13 @@ export function buildPiece(type: PieceType): Asset {
     case 's-bend':
       body = railsForCurve(sBendCurve(), { segments: 40 });
       break;
+    case 's-bend-left':
+      return mirrorAssetX(buildPiece('s-bend'));
     case 'skew':
       body = railsForCurve(skewCurve(), { segments: 32 });
       break;
+    case 'skew-left':
+      return mirrorAssetX(buildPiece('skew'));
     case 'ramp':
       body = railsForCurve(rampCurve());
       break;
@@ -291,7 +297,9 @@ export const ALL_PIECES: PieceType[] = [
   'curve-small',
   'curve-large',
   's-bend',
+  's-bend-left',
   'skew',
+  'skew-left',
   'ramp',
   'curve-small-ramp',
   'curve-large-ramp',

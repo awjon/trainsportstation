@@ -13,11 +13,13 @@ import { makeCarriage, makeLocomotive } from '../render/meshgen/rollingstock';
 import { makeHouse, makeLamp, makeStation, makeTree } from '../render/meshgen/structures';
 import type { Asset } from '../render/meshgen/asset';
 import { BLOOM_LAYER, makeBloom } from '../render/postfx';
+import { buildLayout } from './layout';
 
 const params = new URLSearchParams(location.search);
 const SPIN = params.get('spin') === '1';
 const WIRE = params.get('wire') === '1';
 const FOCUS = params.get('focus');
+const LAYOUT = params.get('view') === 'layout';
 
 const canvas = document.getElementById('app') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -28,7 +30,8 @@ renderer.toneMappingExposure = 1.05;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#bfe3f0');
-scene.fog = new THREE.Fog('#bfe3f0', 28, 62);
+// the layout view spans a large board — push fog back so the whole yard reads
+scene.fog = new THREE.Fog('#bfe3f0', LAYOUT ? 70 : 28, LAYOUT ? 130 : 62);
 
 // shared materials: one lit body material (the instanced-piece material), one unlit glow material
 const bodyMaterial = new THREE.MeshStandardMaterial({
@@ -179,7 +182,12 @@ function waterPatch(w: number, d: number, x: number, z: number): void {
   scene.add(m);
 }
 
-if (FOCUS && catalog[FOCUS]) {
+let layoutStats: { pieces: number; drawCalls: number } | null = null;
+
+if (LAYOUT) {
+  // Instanced track demo: a whole board drawn in a handful of draw calls.
+  layoutStats = buildLayout(scene);
+} else if (FOCUS && catalog[FOCUS]) {
   // single-mesh inspection mode (long pieces are centred so they frame nicely)
   if (FOCUS === 'bridge') waterPatch(3.4, 3.2, 0, 0); // gap the span crosses
   const centred = FOCUS === 'bridge' || FOCUS === 's-bend' || FOCUS === 'hill';
@@ -239,6 +247,7 @@ const views: Record<string, { pos: [number, number, number]; target: [number, nu
   stock: { pos: [-1, 4.5, 14], target: [-1, 0.6, 7] },
   town: { pos: [-1, 5, 19], target: [-1, 0.4, 11] },
   focus: { pos: [3.4, 2.4, 3.8], target: [0, 0.7, 0] },
+  layout: { pos: [13, 15, 27], target: [13, 0, 3] },
 };
 const view = FOCUS ? 'focus' : (params.get('view') ?? 'overview');
 const v = views[view] ?? views.overview;
@@ -250,10 +259,13 @@ const bloom = makeBloom(renderer, scene, camera, { strength: 0.45, radius: 0.3 }
 
 // HUD stats
 const hud = document.getElementById('hud')!;
-hud.innerHTML =
-  `Trainsportstation — procedural asset lab<br>` +
-  `${ALL_PIECES.length} track pieces · loco · carriages · station · props<br>` +
-  `~${Math.round(triangles).toLocaleString()} triangles · baked shading · selective bloom · 0 texture files`;
+hud.innerHTML = layoutStats
+  ? `Trainsportstation — InstancedMesh layout demo<br>` +
+    `${layoutStats.pieces} instanced track pieces · <b>${layoutStats.drawCalls} draw calls</b> · 1 shared material<br>` +
+    `every piece type = 1 draw call, no matter how many are placed (docs/30 §9)`
+  : `Trainsportstation — procedural asset lab<br>` +
+    `${ALL_PIECES.length} track pieces · loco · carriages · station · props<br>` +
+    `~${Math.round(triangles).toLocaleString()} triangles · baked shading · selective bloom · 0 texture files`;
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;

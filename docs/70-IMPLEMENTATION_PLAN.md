@@ -62,7 +62,7 @@ V: `npm run dev` serves the app; CI green on the branch.
 A (exist): `src/core/{math,curves}.ts`, `src/render/meshgen/{palette,sweep,track,rollingstock,structures}.ts`,
 `src/lab/main.ts`, `src/core/curves.test.ts`.
 Reuse: 60 (procedural spec), 30 §6 curves.
-AC: `buildPiece` generates all 14 `PieceType`s; `makeLocomotive`/`makeCarriage`/`makeStation`
+AC: `buildPiece` generates all 16 `PieceType`s; `makeLocomotive`/`makeCarriage`/`makeStation`
 + props build without throwing; one shared vertex-color material; curve endpoint tests green;
 the asset lab renders the full set. This module is the basis M3 builds instancing on.
 V: `npm run test` green; `npm run build` green; asset lab screenshots render all pieces.
@@ -87,7 +87,7 @@ pausable/single-steppable (assist mode + tests need this).
 **M2.1 Piece definitions.**
 A: `data/pieces.json`, `src/track/pieces.ts` + tests.
 Reuse: 30 §4 `PieceDef`, 30 §5 port table (the data), 60 §4 meshgen builder keys.
-AC: all 14 `PieceType`s defined; T-1 rotation round-trip; T-2 port table fixture equality.
+AC: all 16 `PieceType`s defined; T-1 rotation round-trip; T-2 port table fixture equality.
 
 **M2.2 Placement + validation.**
 A: `src/track/placement.ts` + tests.
@@ -105,12 +105,15 @@ AC: T-3 add/remove restores graph; `edgesFrom` honors switch states; `shortestPa
 
 ### M3 — Render foundation (3 tasks) [parallel with M2]
 
-**M3.1 Procedural instancing + scene.**
-A: `src/render/{scene,instances}.ts`, `src/app/main.ts`.
-Reuse: `render/meshgen/*` (built in M0.2), 30 §9 budgets.
-AC: builds each piece geometry once via `buildPiece`, one shared material asserted at runtime
-(dev-mode throw), an `InstancedMesh` per `PieceType`; demo scene draws 500 straights ≤ 5 draw
-calls. (The asset lab `src/lab/main.ts` is the starting harness.)
+**M3.1 Procedural instancing + scene.** *(DONE — `src/render/instances.ts` + `materials.ts`)*
+A (exist): `src/render/instances.ts` (`TrackInstances`), `src/render/materials.ts` (shared
+body + glow materials), `src/lab/layout.ts` (demo), `src/render/instances.test.ts`.
+Reuse: `render/meshgen/*` (M0.2), 30 §9 budgets.
+AC: builds each piece geometry once via `buildPiece`; one shared body material + one glow
+material across all types; an `InstancedMesh` per `PieceType` (+ per glow type); `place()`
+writes transform + biome tint via `instanceColor`. Verified: 500 straights = 1 draw call; a
+one-of-each 16-type board = 17 draw calls (tests). Lab `?view=layout` renders it.
+Remaining for a later pass: fold into the real game `scene.ts` + camera rig (M3.2).
 
 **M3.2 Camera rig + grid picking.**
 A: `src/camera/rig.ts`, `src/app/input.ts`, `src/render/picking.ts`.

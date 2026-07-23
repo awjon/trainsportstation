@@ -75,7 +75,9 @@ from a piece-local `Curve` plus rails/ties/ballast and any kitbash extras:
 | `curve-small` | quarter arc N→E, r = CELL/2 | ballast + ties |
 | `curve-large` | quarter arc N→E, r = 1.5·CELL (2×2 footprint) | ballast + ties |
 | `s-bend` | catmull S, +1 cell lateral over 2 cells | ballast + ties |
+| `s-bend-left` | `mirrorAssetX(s-bend)` | mirror across X |
 | `skew` | catmull sharp lane change, +1 cell over ~1 cell | ballast + ties |
+| `skew-left` | `mirrorAssetX(skew)` | mirror across X |
 | `ramp` | line rising `HEIGHT_UNIT` over one cell | ballast + ties |
 | `curve-small-ramp` | quarter arc N→E rising `HEIGHT_UNIT` (`arcCurve` yEnd) | ballast + ties |
 | `curve-large-ramp` | wide quarter arc rising `HEIGHT_UNIT` (2×2) | ballast + ties |
