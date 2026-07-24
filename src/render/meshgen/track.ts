@@ -9,24 +9,11 @@ import { vec } from '../../core/math';
 import { CELL, HEIGHT_UNIT, PALETTE } from './palette';
 import { box, boxProfile, paint, sweepProfile } from './sweep';
 import { buildAsset, mirrorAssetX, type Asset } from './asset';
+import { PIECE_TYPES, type PieceType } from '../../track/pieces';
 
-export type PieceType =
-  | 'straight'
-  | 'curve-small'
-  | 'curve-large'
-  | 's-bend'
-  | 's-bend-left'
-  | 'skew'
-  | 'skew-left'
-  | 'ramp'
-  | 'curve-small-ramp'
-  | 'curve-large-ramp'
-  | 'hill'
-  | 'bump'
-  | 'bridge'
-  | 'tunnel'
-  | 'junction'
-  | 'crossing';
+// The canonical PieceType lives in the headless track model (src/track/pieces.ts); re-export it
+// so render-side consumers keep importing it from here.
+export type { PieceType };
 
 const HALF = CELL / 2;
 const GAUGE = 0.7; // rail spacing
@@ -292,21 +279,4 @@ export function buildPiece(type: PieceType): Asset {
   return buildAsset(body, glow);
 }
 
-export const ALL_PIECES: PieceType[] = [
-  'straight',
-  'curve-small',
-  'curve-large',
-  's-bend',
-  's-bend-left',
-  'skew',
-  'skew-left',
-  'ramp',
-  'curve-small-ramp',
-  'curve-large-ramp',
-  'hill',
-  'bump',
-  'bridge',
-  'tunnel',
-  'junction',
-  'crossing',
-];
+export const ALL_PIECES: PieceType[] = PIECE_TYPES;

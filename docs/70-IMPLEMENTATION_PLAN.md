@@ -82,26 +82,28 @@ AC: accumulator loop produces exactly 60 ticks/sim-second under mocked frame tim
 33ms, 200ms spiral-of-death clamp); interpolation alpha exposed; loop is
 pausable/single-steppable (assist mode + tests need this).
 
-### M2 — Track model, headless (3 tasks)
+### M2 — Track model, headless (3 tasks) — **DONE**
 
-**M2.1 Piece definitions.**
-A: `data/pieces.json`, `src/track/pieces.ts` + tests.
-Reuse: 30 §4 `PieceDef`, 30 §5 port table (the data), 60 §4 meshgen builder keys.
-AC: all 16 `PieceType`s defined; T-1 rotation round-trip; T-2 port table fixture equality.
+**M2.1 Piece definitions.** *(DONE)*
+A (exist): `src/track/pieces.ts` (canonical `PieceType`/`PieceDef`, `PIECE_DEFS` port table,
+rotation helpers) + `pieces.test.ts`. (The port table is code, not `data/pieces.json` — the
+mesh generator imports `PieceType` from here.)
+Reuse: 30 §4 `PieceDef`, 30 §5 port table.
+AC met: all 16 `PieceType`s defined; T-1 rotation round-trip; T-2 port table fixture equality.
 
-**M2.2 Placement + validation.**
-A: `src/track/placement.ts` + tests.
+**M2.2 Placement + validation.** *(DONE)*
+A (exist): `src/track/placement.ts` (Grid/terrain, `validatePlacement`, `worldFootprint`/
+`worldPorts`) + `placement.test.ts`.
 Reuse: 30 §5 validity rules, `PlacementResult`.
-AC: each of the five failure reasons has a minimal repro test; ramps enforce ±1 height;
-bridge-over-water and tunnel-through-rock cases pass; occupancy respects multi-cell
-footprints under all rotations.
+AC met: five failure reasons each have a minimal repro; ramp bridges a ±1 step;
+bridge-over-water and tunnel-through-rock pass; occupancy respects rotated multi-cell footprints.
 
-**M2.3 Track graph.**
-A: `src/track/graph.ts` + tests.
+**M2.3 Track graph.** *(DONE)*
+A (exist): `src/track/graph.ts` (`TrackGraph`: shared-boundary nodes, directed edges,
+add/remove, `edgesFrom` switch gating, Dijkstra `shortestPathLength`) + `graph.test.ts`.
 Reuse: 30 §4 `TrackGraph`, 30 §5 junction/crossing semantics.
-AC: T-3 add/remove restores graph; `edgesFrom` honors switch states; `shortestPathLength`
-(Dijkstra over edge lengths) matches hand-computed fixtures incl. a junction map;
-`curveClass`/`grade` assigned per edge.
+AC met: T-3 add/remove restores graph; `edgesFrom` honors switch states; `shortestPathLength`
+matches hand-computed line + junction fixtures; `curveClass`/`grade` per edge.
 
 ### M3 — Render foundation (3 tasks) [parallel with M2]
 
