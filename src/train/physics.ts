@@ -66,6 +66,7 @@ function edgeLocalPose(edge: TrackEdge, s: number, graph: TrackGraph, pieceTypeO
       history: [],
       overspeedTicks: 0,
       airborneTicks: 0,
+      dwellTicksRemaining: 0,
     },
     graph,
     pieceTypeOf,

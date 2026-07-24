@@ -34,6 +34,7 @@ function makeTrain(overrides: Partial<TrainState> & Pick<TrainState, 'edgeId'>):
     history: overrides.edgeId ? [overrides.edgeId] : [],
     overspeedTicks: 0,
     airborneTicks: 0,
+    dwellTicksRemaining: 0,
     ...overrides,
   };
 }

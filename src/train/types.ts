@@ -46,4 +46,14 @@ export interface TrainState {
   // crash. 0 whenever the train is on rails or crashed. train/physics.ts (M4.3) is the only
   // reader/writer.
   airborneTicks: number;
+
+  // --- additive field beyond docs/30 §4's sketch (docs/70 M4.4, same additive clause) ---
+  //
+  // §7.5's dwell timer. 0 = not dwelling (either hasn't arrived at a station this edge, or already
+  // departed). Set to `PHYSICS.dwellTicks` the tick the train's motion first crosses a station
+  // edge's midpoint (train/stations.ts's arrival trigger — the same threshold-crossing shape as
+  // M4.3's jump/dead-end triggers), decremented by 1 on each subsequent tick while > 0 (train held
+  // stationary, no events), and stays 0 once it counts back down and the train resumes normal
+  // motion. train/stations.ts is the only reader/writer.
+  dwellTicksRemaining: number;
 }
