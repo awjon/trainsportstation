@@ -138,34 +138,61 @@ well-formed `{position,normal,color}` non-indexed asset and never throws. **Defe
 (junction interaction): expose the junction lever as a named node for the flip animation — it
 is currently baked into the piece glow, which is right for instancing but not yet animatable.
 
-### M4 — Train sim + physics, headless (4 tasks)
+### M4 — Train sim + physics, headless (4 tasks) — **DONE**
 
-**M4.1 Spline compilation + LUTs.**
-A: `src/track/splines.ts` + tests.
-Reuse: 30 §6, `PathDef`.
-AC: LUT lengths within 0.5% of `PathDef.length`; S-1 continuity invariant across all
-adjacent piece pairs generated from the port table.
+**M4.1 Spline compilation + LUTs.** *(DONE)*
+A (exist): `src/track/paths.ts` (new — piece-local `Curve` builders extracted from
+`render/meshgen/track.ts` so sim and render share one geometry source, `pathCurve(type,
+pathIndex)`), `src/track/splines.ts` (`compilePath`/`compileAllPaths` → arc-length `CompiledPath`,
+32/64-sample LUTs) + tests. `track/pieces.ts`'s `L_*` length constants were re-derived exactly
+against real `CELL=2.0` world-unit geometry (they'd been placeholder cell-unit values).
+AC met: every path's LUT length within 0.5% of `PathDef.length`; S-1 continuity tested pairwise
+across representative adjacent piece pairs.
 
-**M4.2 Train kinematics.**
-A: `src/train/{types,movement}.ts` + tests.
-Reuse: 30 §4 `TrainState`, 30 §6 handoff rules, `data/physics.json` (create from 30 §7 baselines).
-AC: P-1 convergence; edge handoff conserves leftover distance (property test: total distance
-= Σv·dt over 1000 random tick sequences); carriage trailing walks edge chains correctly
-around curves and junctions.
+**M4.2 Train kinematics.** *(DONE)*
+A (exist): `src/train/{types,movement}.ts` + tests, `data/physics.json` (all 30 §7 baselines),
+`src/core/types.ts` (new — `Tick`/`TICK_DT`, the M1.1 primitive M4 actually needed). `advanceTrain`
+implements handoff + the §7.1 `vTarget/a/v'` acceleration model (both are this file's job per
+docs/70 — M4.3's own Reuse line starts at §7.2, an early miscue in this delegation that was
+corrected before M4.3 started). Carriage trailing walks a `history` list of traversed edge ids
+(an authorized additive `TrainState` field — 30§4's sketch had no memory of "which edge chain,"
+which converging track needs to disambiguate).
+AC met: P-1 real convergence (v → vTarget within ~3s, all three bets); leftover-distance property
+test (1000 random tick sequences); carriage trailing around a curve and a junction.
 
-**M4.3 Arcade physics: jumps, derails, collisions.**
-A: `src/train/physics.ts` + tests.
-Reuse: 30 §7.2–7.4.
-AC: P-2 derail threshold fixture; P-3 exact-tick collision; jump launch/landing/bad-landing
-each fixture-tested, incl. w2-s5's "Steady teeters into the gorge" case (dead-end below
-vJump at height ≥ 1 → `gap`).
+**M4.3 Arcade physics: jumps, derails, collisions.** *(DONE)*
+A (exist): `src/train/physics.ts` + tests. Landing (§7.2) needed real world-space geometry for
+the first time (searching every placed piece, including ones a jumping train isn't graph-
+connected to) — closed via two small additive dependencies: `track/graph.ts`'s `placements` map
+(placementIndex → Placement + base height) and `track/placement.ts`'s `pieceLocalToWorld`/
+`pieceLocalDirToWorld`. `simulation/events.ts` (new) holds `CrashCause`/`SimEvent` per 30§4.
+A real M4.2 bug was found and fixed here: the dead-end soft-stop must only apply at height 0
+(a slow train off a height ≥ 1 ledge is w2-s5's gap case, not a free stop).
+AC met: P-2 derail threshold (both sides of the boundary, tick 13 not 12); P-3 exact-tick
+collision; jump launch/landing/bad-landing fixture-tested, incl. w2-s5's gap case at both
+height ≥ 1 (below vJump) and height 0 (any overrun at speed).
 
-**M4.4 Stations, boarding, hazards.**
-A: `src/train/stations.ts`, `src/simulation/hazards.ts` + tests.
-Reuse: 30 §7.5, 40 §1.1.
-AC: dwell/stop/board/deliver event sequence matches a golden trace; capacity respected;
-all three hazard kinds fixture-tested (rockfall window, crossing cycle, brokenPiece +
-`PieceRepaired`).
+**M4.4 Stations, boarding, hazards.** *(DONE)*
+A (exist): `src/train/stations.ts`, `src/simulation/hazards.ts` + tests, `src/scenarios/types.ts`
+(new — `Station`/`Passenger`/`Hazard` per 40 §1/§1.1, ahead of M5.1's full scenario schema).
+`stepTrainAtStations` layers on `stepTrainPhysics` the same way physics layers on movement:
+dwell/board/deliver via the same threshold-crossing pattern as M4.3's jump triggers (arrival
+snaps to the edge midpoint rather than modeling gradual braking — same arcade-over-realism
+precedent). All three hazard kinds share one "is this location blocked" predicate at
+piece-footprint granularity. `CarriageState.personaId` is read as the specific `Passenger.id`
+(an interpretation call — nothing in 30§4 states this explicitly, flagged for M5 to confirm).
+**Important for M5**: none of `boarded`/`delivered`/`repairedPlacements` ledgers are stored
+anywhere in `train/`or `simulation/` — every M4.4 function is pure and stateless; the M5 sim
+orchestrator owns threading these sets across ticks and across all trains/stations from the
+returned `SimEvent`s.
+AC met: golden dwell/board/deliver trace with exact tick accounting; capacity respected;
+all three hazard kinds fixture-tested including repair-driven `PieceRepaired`.
+
+**Cross-cutting note for M5**: `locoPose`/`carriagePose` (movement.ts) and the jump/landing exit
+poses (physics.ts) are all piece-local, not world-space — `TrackGraph` has no placement transform
+beyond the `placements` map M4.3 added (cell + rotation + base height only). M5's sim/replay layer
+(or M6's renderer) must apply that transform itself for anything it draws or logs in world
+coordinates.
 
 ### M5 — Scenario runtime (4 tasks)
 
