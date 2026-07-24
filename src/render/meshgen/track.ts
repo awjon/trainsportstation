@@ -4,12 +4,13 @@
 // object the sim moves trains along, the rendered rails land exactly on the ports.
 
 import * as THREE from 'three';
-import { arcCurve, catmullCurve, lineCurve, sampleFrames, type Curve } from '../../core/curves';
+import { lineCurve, sampleFrames, type Curve } from '../../core/curves';
 import { vec } from '../../core/math';
 import { CELL, HEIGHT_UNIT, PALETTE } from './palette';
 import { box, boxProfile, paint, sweepProfile } from './sweep';
 import { buildAsset, mirrorAssetX, type Asset } from './asset';
 import { PIECE_TYPES, type PieceType } from '../../track/pieces';
+import { pathCurve } from '../../track/paths';
 
 // The canonical PieceType lives in the headless track model (src/track/pieces.ts); re-export it
 // so render-side consumers keep importing it from here.
@@ -90,46 +91,9 @@ function railsForCurve(curve: Curve, opts: RailOpts = {}): THREE.BufferGeometry[
   return parts;
 }
 
-// --- per-piece curves (piece-local, cell (0,0) centered at origin) ---
-
-function straightCurve(): Curve {
-  return lineCurve(vec(0, 0, -HALF), vec(0, 0, HALF));
-}
-function curveSmall(): Curve {
-  return arcCurve(vec(HALF, 0, -HALF), vec(0, 0, -HALF), -Math.PI / 2);
-}
-function curveLarge(): Curve {
-  return arcCurve(vec(1.5 * CELL, 0, -HALF), vec(0, 0, -HALF), -Math.PI / 2);
-}
-function rampCurve(): Curve {
-  return lineCurve(vec(0, 0, -HALF), vec(0, HEIGHT_UNIT, HALF));
-}
-function hillCurve(): Curve {
-  return catmullCurve([vec(0, 0, -HALF), vec(0, 0.7, HALF), vec(0, 0, 1.5 * CELL)]);
-}
-function bumpCurve(): Curve {
-  return catmullCurve([vec(0, 0, -HALF), vec(0, 0.42, 0), vec(0, 0, HALF)]);
-}
-// curved inclines: same arcs as the flat curves, but climbing one height level (N@0 → E@+1)
-function curveSmallRampCurve(): Curve {
-  return arcCurve(vec(HALF, 0, -HALF), vec(0, 0, -HALF), -Math.PI / 2, HEIGHT_UNIT);
-}
-function curveLargeRampCurve(): Curve {
-  return arcCurve(vec(1.5 * CELL, 0, -HALF), vec(0, 0, -HALF), -Math.PI / 2, HEIGHT_UNIT);
-}
-// s-bend: a gentle 2-cell lateral shift (+1 cell in x), entering and leaving heading +Z
-function sBendCurve(): Curve {
-  return catmullCurve([vec(0, 0, -HALF), vec(0, 0, HALF), vec(CELL, 0, CELL), vec(CELL, 0, 1.5 * CELL)]);
-}
-// skew: a sharper single-cell lane change (+1 cell in x over one cell of length)
-function skewCurve(): Curve {
-  return catmullCurve([
-    vec(0, 0, -HALF),
-    vec(0, 0, -HALF + 0.25),
-    vec(CELL, 0, HALF - 0.25),
-    vec(CELL, 0, HALF),
-  ]);
-}
+// Piece-local path curves now live in track/paths.ts (headless — M4.1 extraction), shared
+// verbatim with the sim's arc-length LUTs (track/splines.ts). Use `pathCurve(type, pathIndex)`
+// below instead of a private per-piece builder.
 
 // --- kitbash extras ---
 
@@ -193,7 +157,7 @@ function tunnelMouth(z: number): THREE.BufferGeometry[] {
  * doorway at each end. Ports N@0 / S@0.
  */
 function moundTunnel(): THREE.BufferGeometry[] {
-  const parts: THREE.BufferGeometry[] = [...railsForCurve(straightCurve())];
+  const parts: THREE.BufferGeometry[] = [...railsForCurve(pathCurve('tunnel', 0))];
   const hill = new THREE.SphereGeometry(1.0, 22, 14, 0, Math.PI * 2, 0, Math.PI / 2);
   hill.scale(1.4, 1.55, 1.12); // half-width 1.4, height 1.55 (> train), half-length 1.12
   parts.push(paint(hill, PALETTE.grassDark));
@@ -219,38 +183,38 @@ export function buildPiece(type: PieceType): Asset {
   const glow: THREE.BufferGeometry[] = [];
   switch (type) {
     case 'straight':
-      body = railsForCurve(straightCurve());
+      body = railsForCurve(pathCurve('straight', 0));
       break;
     case 'curve-small':
-      body = railsForCurve(curveSmall());
+      body = railsForCurve(pathCurve('curve-small', 0));
       break;
     case 'curve-large':
-      body = railsForCurve(curveLarge(), { segments: 36 });
+      body = railsForCurve(pathCurve('curve-large', 0), { segments: 36 });
       break;
     case 's-bend':
-      body = railsForCurve(sBendCurve(), { segments: 40 });
+      body = railsForCurve(pathCurve('s-bend', 0), { segments: 40 });
       break;
     case 's-bend-left':
       return mirrorAssetX(buildPiece('s-bend'));
     case 'skew':
-      body = railsForCurve(skewCurve(), { segments: 32 });
+      body = railsForCurve(pathCurve('skew', 0), { segments: 32 });
       break;
     case 'skew-left':
       return mirrorAssetX(buildPiece('skew'));
     case 'ramp':
-      body = railsForCurve(rampCurve());
+      body = railsForCurve(pathCurve('ramp', 0));
       break;
     case 'curve-small-ramp':
-      body = railsForCurve(curveSmallRampCurve());
+      body = railsForCurve(pathCurve('curve-small-ramp', 0));
       break;
     case 'curve-large-ramp':
-      body = railsForCurve(curveLargeRampCurve(), { segments: 36 });
+      body = railsForCurve(pathCurve('curve-large-ramp', 0), { segments: 36 });
       break;
     case 'hill':
-      body = railsForCurve(hillCurve(), { segments: 40 });
+      body = railsForCurve(pathCurve('hill', 0), { segments: 40 });
       break;
     case 'bump':
-      body = railsForCurve(bumpCurve());
+      body = railsForCurve(pathCurve('bump', 0));
       break;
     case 'bridge':
       body = bridgeSpan();
@@ -261,8 +225,8 @@ export function buildPiece(type: PieceType): Asset {
     case 'junction': {
       const lever = leverPost();
       body = [
-        ...railsForCurve(straightCurve(), { ballast: true }),
-        ...railsForCurve(curveSmall(), { ballast: false, ties: false }),
+        ...railsForCurve(pathCurve('junction', 0), { ballast: true }),
+        ...railsForCurve(pathCurve('junction', 1), { ballast: false, ties: false }),
         ...lever.body,
       ];
       glow.push(...lever.glow);
@@ -271,8 +235,8 @@ export function buildPiece(type: PieceType): Asset {
     case 'crossing':
       body = [
         ...crossingDeck(),
-        ...railsForCurve(straightCurve(), { ballast: false }),
-        ...railsForCurve(lineCurve(vec(-HALF, 0, 0), vec(HALF, 0, 0)), { ballast: false }),
+        ...railsForCurve(pathCurve('crossing', 0), { ballast: false }),
+        ...railsForCurve(pathCurve('crossing', 1), { ballast: false }),
       ];
       break;
   }
