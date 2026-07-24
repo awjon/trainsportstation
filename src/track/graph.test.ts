@@ -49,15 +49,15 @@ describe('TrackGraph', () => {
     const c = g.addPlacement(2, straight(0, 2));
     const start = a[0]; // far north node
     const end = c[1]; // far south node
-    expect(g.shortestPathLength(start, end)).toBeCloseTo(3, 6); // 3 × unit-length straights
+    expect(g.shortestPathLength(start, end)).toBeCloseTo(6, 6); // 3 × straight length (CELL = 2.0)
   });
 
   it('shortestPathLength prefers the shorter junction route', () => {
     const g = new TrackGraph();
     const [nNode, sNode, eNode] = g.addPlacement(0, { piece: 'junction', cell: { x: 2, z: 2 }, rotation: 0 });
-    const through = g.shortestPathLength(nNode, sNode); // straight length 1
-    const branch = g.shortestPathLength(nNode, eNode); // tight quarter-arc < 1
-    expect(through).toBeCloseTo(1, 6);
+    const through = g.shortestPathLength(nNode, sNode); // straight length CELL = 2
+    const branch = g.shortestPathLength(nNode, eNode); // tight quarter-arc < through
+    expect(through).toBeCloseTo(2, 6);
     expect(branch).not.toBeNull();
     expect(branch!).toBeLessThan(through!);
   });
