@@ -32,6 +32,8 @@ function makeTrain(overrides: Partial<TrainState> & Pick<TrainState, 'edgeId'>):
     crashed: false,
     carriages: [],
     history: overrides.edgeId ? [overrides.edgeId] : [],
+    overspeedTicks: 0,
+    airborneTicks: 0,
     ...overrides,
   };
 }
@@ -305,6 +307,32 @@ describe('dead end handling', () => {
     expect(result.state.v).toBeCloseTo(vAccel, 9); // the accelerated v, unchanged by the overrun branch
     expect(result.deadEndOverrun).not.toBeNull();
     expect(result.deadEndOverrun!).toBeCloseTo(expectedOverrun, 9);
+  });
+
+  it('does NOT soft-stop at height >= 1 even when v <= vCrawl — height 0 is required (docs/30 §6)', () => {
+    // Regression test for a bug found while building M4.3 (jump/gap logic): docs/30 §6's exact
+    // wording is "Dead end ... AT HEIGHT 0 and v <= vCrawl: train stops (soft) ... at speed: see
+    // jump/crash rules". The original M4.2 delivery omitted the height check, so a slow-rolling
+    // train at ANY height would soft-stop — silently swallowing w2-s5's "Steady teeters into the
+    // gorge" case (a low-speed dead end at height >= 1 must signal an overrun so M4.3 can turn it
+    // into `Crashed{cause:'gap'}`, not quietly stop the train as if nothing happened).
+    const graph = new TrackGraph();
+    graph.addPlacement(0, { piece: 'ramp', cell: { x: 0, z: 0 }, rotation: 0 }); // climbs to height 1, dead end
+    const edge = graph.edges.get('0:0:f')!;
+    expect(graph.nodes.get(edge.to)?.height).toBe(1);
+
+    const bet: SpeedBet = 'steady';
+    const dt = 1 / 60;
+    const v0 = 0;
+
+    const vAccel = accelerate(v0, edge.grade, bet, dt);
+    expect(vAccel).toBeLessThanOrEqual(PHYSICS.vCrawl); // still "slow" by the vCrawl definition
+
+    const train = makeTrain({ edgeId: '0:0:f', s: edge.length - 1e-6, v: v0 });
+    const result = advanceTrain(train, graph, noSwitches, bet, dt);
+
+    expect(result.state.v).toBeCloseTo(vAccel, 9); // NOT hard-zeroed, unlike the height-0 case
+    expect(result.deadEndOverrun).not.toBeNull();
   });
 
   it('a junction with no settable branch open counts as a dead end too', () => {

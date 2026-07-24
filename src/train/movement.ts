@@ -96,6 +96,20 @@ function trimHistory(history: string[], graph: TrackGraph, maxOffset: number): s
 }
 
 /**
+ * The §7.1 longitudinal/acceleration model in isolation: `vTarget = vBase * betMult(bet)`,
+ * `a = aThrottle*sign(vTarget-v) - gSlope*grade - cDrag*v`, `v' = clamp(v + a*dt, 0, vHardMax)`.
+ * Extracted (docs/70 M4.3) so `advanceTrain` below and `train/physics.ts` share one
+ * implementation — physics.ts needs to predict this tick's `v` (to decide whether a jump
+ * triggers) before it knows whether it'll even call `advanceTrain` this tick. Pure, no behavior
+ * change from the inline version this replaces.
+ */
+export function updateVelocity(v: number, grade: -1 | 0 | 1, speedBet: SpeedBet, dt: number): number {
+  const vTarget = PHYSICS.vBase * PHYSICS.betMult[speedBet];
+  const a = PHYSICS.aThrottle * Math.sign(vTarget - v) - PHYSICS.gSlope * grade - PHYSICS.cDrag * v;
+  return Math.min(Math.max(v + a * dt, 0), PHYSICS.vHardMax);
+}
+
+/**
  * Advance a single on-rails train by `dt` seconds: first the §7.1 longitudinal/acceleration
  * update to `v` (using the CURRENT edge's grade, i.e. the edge occupied at the START of this
  * tick, before any handoff processing below — docs/70's correction is explicit that grade does
@@ -134,16 +148,10 @@ export function advanceTrain(
   // unambiguously non-undefined for the rest of the function.
   let edge: TrackEdge = startEdge;
 
-  // --- §7.1 longitudinal model: vTarget = vBase * betMult(bet); a = aThrottle*sign(vTarget-v)
-  // - gSlope*grade - cDrag*v; v' = clamp(v + a*dt, 0, vHardMax) — applied to `v` BEFORE position
-  // integration (docs/30 §6: "with the physics update of §7 applied to v first"), using
-  // `startEdge.grade` (this tick's starting edge only, per the function doc above).
-  const vTarget = PHYSICS.vBase * PHYSICS.betMult[speedBet];
-  const a =
-    PHYSICS.aThrottle * Math.sign(vTarget - train.v) -
-    PHYSICS.gSlope * startEdge.grade -
-    PHYSICS.cDrag * train.v;
-  let v = Math.min(Math.max(train.v + a * dt, 0), PHYSICS.vHardMax);
+  // §7.1 update, applied to `v` BEFORE position integration (docs/30 §6: "with the physics
+  // update of §7 applied to v first"), using `startEdge.grade` (this tick's starting edge only,
+  // per the function doc above).
+  let v = updateVelocity(train.v, startEdge.grade, speedBet, dt);
 
   let s = train.s + v * dt;
   const history = train.history.slice();
@@ -168,10 +176,20 @@ export function advanceTrain(
 
     if (options.length === 0) {
       s = edge.length;
-      if (v <= PHYSICS.vCrawl) {
-        // Soft stop (docs/30 §6): a kinematic boundary condition that overrides the §7.1
-        // acceleration result computed above, not a rule the formula itself expresses — this is
-        // the only place this file hard-sets `v` outside that formula.
+      // Soft stop (docs/30 §6) applies ONLY at height 0 — the doc's exact wording is "Dead end
+      // ... at height 0 and v <= vCrawl: train stops (soft)"; at height >= 1 it's explicit that
+      // "at speed: see jump/crash rules §7.2" instead, REGARDLESS of v vs vCrawl (a slow-rolling
+      // train off a height>=1 ledge doesn't get a free soft stop — it's w2-s5's "Steady teeters
+      // into the gorge" case, docs/70 M4.3: below vJump at height>=1 is a `gap` crash, not a
+      // stop). This height check was missing from the original M4.2 delivery (a real bug caught
+      // while building M4.3's jump/gap logic, which depends on it) — fixed here rather than
+      // silently worked around in physics.ts, since the soft-stop boundary condition belongs to
+      // this file's dead-end handling either way.
+      const nodeHeight = graph.nodes.get(edge.to)?.height ?? 0;
+      if (nodeHeight === 0 && v <= PHYSICS.vCrawl) {
+        // A kinematic boundary condition that overrides the §7.1 acceleration result computed
+        // above, not a rule the formula itself expresses — this is the only place this file
+        // hard-sets `v` outside that formula.
         v = 0;
         deadEndOverrun = null;
       } else {

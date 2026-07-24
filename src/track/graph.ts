@@ -47,6 +47,17 @@ export class TrackGraph {
   readonly edges = new Map<string, TrackEdge>();
   private readonly adjacency = new Map<string, string[]>(); // nodeId → edgeIds (outgoing)
   private readonly placementPorts = new Map<number, string[]>(); // placementIndex → node id per port
+  /**
+   * placementIndex → its own `Placement` (piece/cell/rotation) + terrain base height (docs/70
+   * M4.3, additive — nothing above this reads or depends on it). Populated/deleted in lockstep
+   * with `placementPorts` below. Needed because jump/landing physics (§7.2) must resolve
+   * piece-local geometry (`compilePath`) to WORLD space across placements a train's current edge
+   * isn't graph-connected to (the entire point of a jump is crossing a gap between disconnected
+   * track) — `TrackEdge` alone (placementIndex/pathIndex, no transform) can't do that; this is the
+   * transform lookup train/physics.ts needs, paired with track/placement.ts's
+   * `pieceLocalToWorld`/`pieceLocalDirToWorld`.
+   */
+  readonly placements = new Map<number, { placement: Placement; base: number }>();
 
   /** Add a placed piece. `base` is the terrain height under its anchor cell. Returns its port nodes. */
   addPlacement(index: number, placement: Placement, base = 0): string[] {
@@ -64,6 +75,7 @@ export class TrackGraph {
       return id;
     });
     this.placementPorts.set(index, portNodeIds);
+    this.placements.set(index, { placement, base });
 
     def.paths.forEach((path, pathIndex) => {
       const a = portNodeIds[path.fromPort];
@@ -114,6 +126,7 @@ export class TrackGraph {
       }
     }
     this.placementPorts.delete(index);
+    this.placements.delete(index);
   }
 
   /** Outgoing edges from a node, gated by switch state (default 0) for junction pieces. */

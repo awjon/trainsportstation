@@ -1,7 +1,7 @@
-// M4.2 tests (docs/70; docs/30 §3.1, §4): TICK_DT is exactly the fixed sim timestep, and
-// TrainState/CarriageState accept the canonical field set verbatim plus the one authorized
-// additive `history` field. Mostly a compile-time shape check (there's little runtime behavior
-// in a pair of plain interfaces) with a couple of sanity assertions.
+// M4.2/M4.3 tests (docs/70; docs/30 §3.1, §4): TICK_DT is exactly the fixed sim timestep, and
+// TrainState/CarriageState accept the canonical field set verbatim plus the authorized additive
+// `history`/`overspeedTicks`/`airborneTicks` fields. Mostly a compile-time shape check (there's
+// little runtime behavior in a pair of plain interfaces) with a couple of sanity assertions.
 
 import { describe, expect, it } from 'vitest';
 import { TICK_DT } from '../core/types';
@@ -13,8 +13,8 @@ describe('core/types', () => {
   });
 });
 
-describe('TrainState / CarriageState shape (docs/30 §4 verbatim + additive history)', () => {
-  it('accepts every canonical field plus the additive history field', () => {
+describe('TrainState / CarriageState shape (docs/30 §4 verbatim + additive fields)', () => {
+  it('accepts every canonical field plus the additive history/overspeedTicks/airborneTicks fields', () => {
     const carriage: CarriageState = { personaId: 'p1', offset: 0.55 };
     const train: TrainState = {
       id: 't1',
@@ -26,6 +26,8 @@ describe('TrainState / CarriageState shape (docs/30 §4 verbatim + additive hist
       crashed: false,
       carriages: [carriage],
       history: ['0:0:f'],
+      overspeedTicks: 0,
+      airborneTicks: 0,
     };
     expect(train.id).toBe('t1');
     expect(train.edgeId).toBe('0:0:f');
@@ -33,6 +35,8 @@ describe('TrainState / CarriageState shape (docs/30 §4 verbatim + additive hist
     expect(train.crashed).toBe(false);
     expect(train.carriages[0]).toEqual(carriage);
     expect(train.history).toEqual(['0:0:f']);
+    expect(train.overspeedTicks).toBe(0);
+    expect(train.airborneTicks).toBe(0);
   });
 
   it('airborne holds a pos/vel triple when the train is in flight', () => {
@@ -46,10 +50,13 @@ describe('TrainState / CarriageState shape (docs/30 §4 verbatim + additive hist
       crashed: false,
       carriages: [],
       history: [],
+      overspeedTicks: 0,
+      airborneTicks: 3,
     };
     expect(train.edgeId).toBeNull();
     expect(train.airborne?.pos).toEqual([0, 1, 0]);
     expect(train.airborne?.vel).toEqual([0, -1, 2]);
+    expect(train.airborneTicks).toBe(3);
   });
 
   it('carriages may be empty and history may be empty (degenerate but valid states)', () => {
@@ -63,6 +70,8 @@ describe('TrainState / CarriageState shape (docs/30 §4 verbatim + additive hist
       crashed: true,
       carriages: [],
       history: [],
+      overspeedTicks: 0,
+      airborneTicks: 0,
     };
     expect(train.carriages).toHaveLength(0);
     expect(train.history).toHaveLength(0);

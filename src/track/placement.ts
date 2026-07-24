@@ -3,7 +3,10 @@
 // footprint and world ports (which the graph then wires up). Five failure reasons, checked in
 // order: out-of-bounds → occupied → terrain-blocked → height-mismatch → port-mismatch.
 
+import { vec, type Vec3 } from '../core/math';
 import {
+  CELL,
+  HEIGHT_UNIT,
   PIECE_DEFS,
   edgeStep,
   opposite,
@@ -143,4 +146,45 @@ export function validatePlacement(grid: Grid, existing: Placement[], placement: 
   }
 
   return { ok: true, footprint, ports: worldPorts(placement) };
+}
+
+// --- piece-local -> world transform (docs/70 M4.3) ---
+//
+// track/splines.ts's `compilePath` (M4.1) only ever returns points/tangents in a piece's own
+// LOCAL frame ("cell (0,0) centered at origin"), and nothing before M4.3 needed to turn that into
+// a world-space position — train/movement.ts's M4.2 report flagged exactly this gap for
+// locoPose/carriagePose. Jump/landing physics (§7.2) makes it unavoidable: landing has to search
+// across ALL placed pieces for a nearby track point, including ones the jumping train isn't
+// graph-connected to (that's the whole point of a jump), which only makes sense in world space.
+//
+// The rotation step reuses `rotateCell`'s exact formula: it's a linear quarter-turn-clockwise
+// rotation about Y, and that math doesn't care whether the (x,z) pair is an integer cell offset
+// or a continuous world-unit distance — same reasoning already validated independently by
+// track/splines.test.ts's S-1 continuity checks, which define their own (necessarily identical)
+// `rotateXZ` helper for exactly this purpose. Y is never rotated: piece rotation is only ever
+// about the Y axis, so piece-local "up" and world "up" always coincide, which is why gravity/jump
+// math never needs to account for a piece's rotation — only XZ position does.
+
+/** Rotate a piece-local (x,z) pair by `rotation` quarter-turns clockwise about Y (Y untouched). */
+function rotateLocalXZ(local: Vec3, rotation: Rotation): Vec3 {
+  const rotated = rotateCell({ x: local.x, z: local.z }, rotation);
+  return vec(rotated.x, local.y, rotated.z);
+}
+
+/** A piece-local point (e.g. `compilePath(...).pointAt(s)`) transformed into world space for a
+ * given placement. `base` is the terrain height under the placement's anchor cell (as passed to
+ * `TrackGraph.addPlacement`/stored in its `placements` map). */
+export function pieceLocalToWorld(local: Vec3, placement: Placement, base: number): Vec3 {
+  const rotated = rotateLocalXZ(local, placement.rotation);
+  return vec(
+    rotated.x + placement.cell.x * CELL,
+    rotated.y + base * HEIGHT_UNIT,
+    rotated.z + placement.cell.z * CELL,
+  );
+}
+
+/** Direction-only variant (rotation, no translation) — for tangents/velocities, which have no
+ * position to translate. */
+export function pieceLocalDirToWorld(local: Vec3, placement: Placement): Vec3 {
+  return rotateLocalXZ(local, placement.rotation);
 }

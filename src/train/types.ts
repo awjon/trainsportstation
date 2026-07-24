@@ -31,4 +31,19 @@ export interface TrainState {
   // unbounded. This is additive per docs/30 §4 ("Field lists may grow additively; renames/
   // removals may not") — none of the doc's existing fields are renamed or dropped.
   history: string[];
+
+  // --- additive fields beyond docs/30 §4's sketch (docs/70 M4.3 explicitly authorizes these,
+  // same "additive" clause as `history` above) ---
+  //
+  // §7.3's derail rule ("exceeding [the curveClass max speed] for more than derailGraceTicks
+  // consecutive ticks") needs a counter of CONSECUTIVE overspeed ticks — there is nowhere else to
+  // keep that memory between ticks. Reset to 0 on a straight edge or whenever v drops back to/
+  // under the threshold; train/physics.ts (M4.3) is the only reader/writer.
+  overspeedTicks: number;
+  // §7.2's Airtime event needs `durationTicks`, i.e. how long the train was airborne — again,
+  // memory that must live somewhere between ticks. Set to 1 at launch, incremented once per
+  // airborne tick, read (as the event's durationTicks) and reset to 0 on landing or bad-landing
+  // crash. 0 whenever the train is on rails or crashed. train/physics.ts (M4.3) is the only
+  // reader/writer.
+  airborneTicks: number;
 }

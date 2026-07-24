@@ -84,8 +84,12 @@ const p = (cell: CellCoord, edge: Direction, height: HeightLevel = 0): Port => (
 
 // World-unit constants mirrored from render/meshgen/palette.ts (this file is headless and must
 // not import render/*, docs/30 §2.1) — keep numerically in sync with palette.ts by hand.
-const CELL = 2.0;
-const HEIGHT_UNIT = 1.0;
+// CELL/HEIGHT_UNIT are exported (docs/70 M4.3) so track/placement.ts's pieceLocalToWorld/
+// pieceLocalDirToWorld can reuse them rather than adding a third hand-kept-in-sync copy (splines.ts's
+// paths.ts already has its own; this is a deliberate exception to that "each headless file
+// re-declares its own copy" pattern, per the M4.3 task's explicit instruction to reuse these).
+export const CELL = 2.0;
+export const HEIGHT_UNIT = 1.0;
 const HALF = CELL / 2;
 
 // Exact path lengths in world units (M4.1: LUT-verified in track/splines.test.ts against

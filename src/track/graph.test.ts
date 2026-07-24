@@ -68,4 +68,17 @@ describe('TrackGraph', () => {
     const b = g.addPlacement(1, straight(5, 5)); // disconnected island
     expect(g.shortestPathLength(a[0], b[1])).toBeNull();
   });
+
+  // docs/70 M4.3: `placements` records each placementIndex's own Placement + terrain base height,
+  // populated/deleted in lockstep with the pre-existing `placementPorts` bookkeeping — needed so
+  // train/physics.ts can resolve piece-local jump/landing geometry to world space for placements
+  // a train isn't graph-connected to.
+  it('placements records the placement + base height per index, and clears on removal', () => {
+    const g = new TrackGraph();
+    const p = straight(3, 4);
+    g.addPlacement(0, p, 2);
+    expect(g.placements.get(0)).toEqual({ placement: p, base: 2 });
+    g.removePlacement(0);
+    expect(g.placements.has(0)).toBe(false);
+  });
 });
