@@ -16,22 +16,21 @@ scenario disagree, fix the scenario first, then the brief.
 
 ## 1. World progression table (all 10 worlds, normative)
 
-One new mechanic and at most two new personas per world. "Kit" = recommended Kenney CC0
-environment kit (confirm exact names at kenney.nl when downloading; procedural fallback in
-60 §3 if a kit is unavailable).
+One new mechanic and at most two new personas per world. "Dressing" = the procedural prop set
++ palette that gives each biome its identity (generated per 60 §5; all art is code, no kits).
 
-| W | Name | Biome id | Palette accent | New mechanic | New pieces | New personas | Trains | Kit |
+| W | Name | Biome id | Palette accent | New mechanic | New pieces | New personas | Trains | Dressing |
 |---|---|---|---|---|---|---|---|---|
-| 1 | Meadow Junction | `meadow` | spring green | routing basics | straight, curve-small, curve-large | commuter, kid | 1 | Nature Kit |
-| 2 | Highland Gap | `highland` | heather purple | elevation & jumps | ramp, hill, bump, bridge | elder, musician | 1 | Nature Kit (cliffs/rocks) |
-| 3 | Twin Rivers | `rivers` | river teal | junctions & crossings | junction, crossing | doctor, engineer | 2 | Fantasy Town Kit |
-| 4 | Dusty Mesa | `mesa` | terracotta | tunnels & rockfalls | tunnel | — | 2 | (desert/western kit) |
-| 5 | Frostfield | `frostfield` | ice blue | momentum (low drag/brake zones) | — (ice terrain) | — | 2 | Holiday Kit |
-| 6 | Coast of Lanterns | `coast` | lantern amber | timed hazards (drawbridge/traffic) | — | — | 3 | Pirate Kit |
-| 7 | Mushroom Hollow | `hollow` | glow violet | dark stages & beacon lighting | — | — | 3 | Nature/Fantasy Kit |
-| 8 | Skyline City | `skyline` | signal yellow | multi-level (height 2, under/over) | — | — | 3 | City Kit (Commercial) |
-| 9 | Cloudpeak | `cloudpeak` | cloud white | chained jumps | — | — | 4 | (mountain/sky props) |
-| 10 | The Last Junction | `last-junction` | ember orange | all mechanics, finale | — | — | 4 | mixed |
+| 1 | Meadow Junction | `meadow` | spring green | routing basics | straight, curve-small, curve-large | commuter, kid | 1 | pine trees, cottages, lamps |
+| 2 | Highland Gap | `highland` | heather purple | elevation & jumps | ramp, hill, bump, bridge | elder, musician | 1 | cliffs, boulders, tall pines |
+| 3 | Twin Rivers | `rivers` | river teal | junctions & crossings | junction, crossing | doctor, engineer | 2 | water tiles, mills, riverside houses |
+| 4 | Dusty Mesa | `mesa` | terracotta | tunnels & rockfalls | tunnel | — | 2 | mesas, cacti, timber trestles |
+| 5 | Frostfield | `frostfield` | ice blue | momentum (low drag/brake zones) | — (ice terrain) | — | 2 | snow mounds, firs, frozen ponds |
+| 6 | Coast of Lanterns | `coast` | lantern amber | timed hazards (drawbridge/traffic) | — | — | 3 | docks, lanterns, sailboats |
+| 7 | Mushroom Hollow | `hollow` | glow violet | dark stages & beacon lighting | — | — | 3 | glowing mushrooms, beacons |
+| 8 | Skyline City | `skyline` | signal yellow | multi-level (height 2, under/over) | — | — | 3 | towers, overpasses, signage |
+| 9 | Cloudpeak | `cloudpeak` | cloud white | chained jumps | — | — | 4 | cloud platforms, peaks, banners |
+| 10 | The Last Junction | `last-junction` | ember orange | all mechanics, finale | — | — | 4 | mixed props from all worlds |
 
 Campaign trays only contain pieces unlocked at or before that world's row. Star time bands
 (authoring guidance): W1 `timeTarget ≈ refRun × 1.35`, W2 `× 1.25`, W3+ `× 1.15–1.2`

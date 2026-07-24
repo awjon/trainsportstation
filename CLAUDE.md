@@ -42,7 +42,7 @@ Mission: Build Trainsportstation while preserving its identity.
 
 Key decisions:
 - Three.js.
-- Kenney assets.
+- Procedural assets (all meshes generated in code; no model/texture files — see docs/60).
 - Web first.
 - Mobile ready.
 - Arcade physics.

@@ -1,172 +1,148 @@
-# 60 — Asset Pipeline
+# 60 — Asset Pipeline (Procedural)
 
-Doc version: 1.0.0 · Normative for `data/assets.json`, `kenney-train-kit/`, and future kit drops
+Doc version: 2.0.0 · Normative for `src/render/meshgen/*`, `src/core/curves.ts`, `data/*`
 
-The repo ships the **Kenney Train Kit**: 85 GLB models sharing one texture
-(`kenney-train-kit/Models/GLB/Textures/colormap.png`). The user will add further Kenney CC0
-environment kits (per-biome, 20 §1); this doc defines the manifest, mappings, the resolution
-for models the train kit lacks, and the conventions any new kit must be checked against.
+**All game art is generated in code at runtime. There are no model files and no texture
+files.** This supersedes the v1.x pipeline (Kenney GLB kit + colormap), which has been
+removed from the repo. The whole asset payload is a few KB of TypeScript compiled into the
+bundle; the only meaningful download weight is Three.js itself (~131 KB gzipped).
+
+Why procedural, beyond size: track meshes are **swept along the exact curves the simulation
+moves trains on** (docs/30 §6), so the rails can never drift from the collision path — grid
+alignment is guaranteed by construction, and the missing-model gap from v1 (bridge, tunnel,
+junction, crossing, station) disappears because those are just more generated geometry.
+
+Reference implementation for everything in this doc already exists under
+`src/render/meshgen/` and is exercised by the asset lab (`src/lab/main.ts`).
 
 ---
 
-## 1. Kit inventory (as shipped)
+## 1. Principles (normative)
 
-| Category | Count | Models (pattern) |
+1. **No binary assets.** No `.glb`, `.gltf`, `.png`, `.jpg`, `.ktx`. A build test asserts the
+   repo (outside `docs/`) contains no such files (60 §8). Icons/audio: see §6, §7.
+2. **One shared body material + baked lighting.** Every body mesh renders through a single
+   flat-shaded `MeshStandardMaterial` with `vertexColors: true` (docs/30 §9). Color lives in
+   each geometry's `color` attribute (`paint()`); soft lighting (hemispheric + gradient +
+   contact AO) is baked into that same attribute by `shade()`/`finalizeAsset` at build time —
+   free at runtime and preserved through `InstancedMesh`. Emissive lights (headlight, lamp,
+   junction signal) are kept as separate `glow` geometry on a bloom layer (`postfx.ts`,
+   unlit `MeshBasicMaterial`) so bloom is selective — only lights glow, never bright surfaces.
+3. **One attribute shape.** Every generated geometry is non-indexed with exactly
+   `{ position, normal, color }` and no `uv`. `paint()` normalizes this so heterogeneous
+   parts (swept tubes + box/cylinder primitives) always merge.
+4. **Curve-derived track.** Track geometry is produced by sweeping a 2D profile along a
+   `Curve` (`src/core/curves.ts`) — the same curve type the sim uses. Track pieces are never
+   authored as static vertex lists.
+5. **Deterministic geometry.** Generators take explicit parameters only (no `Math.random`);
+   the same inputs yield byte-identical geometry. Any decorative variation is a seeded
+   parameter passed in by the caller.
+
+## 2. Module map
+
+| File | Responsibility |
+|---|---|
+| `src/core/math.ts` | dependency-free `Vec3` + helpers (headless zone) |
+| `src/core/curves.ts` | `Curve` (line/arc/catmull), `sampleFrames`, `curveLength`, `frameOffset` — shared by sim and meshgen |
+| `src/render/meshgen/palette.ts` | `CELL`, `HEIGHT_UNIT`, the `PALETTE` (single source of color truth) |
+| `src/render/meshgen/sweep.ts` | `sweepProfile`, `boxProfile`, `paint`, `merge`, `box`/`cyl`/`cone` primitives |
+| `src/render/meshgen/sweep.ts` | + `roundedBox` (chamfered hero parts) |
+| `src/render/meshgen/shading.ts` | `shade`/`finalizeAsset` — bake hemispheric + gradient + contact lighting into vertex color |
+| `src/render/meshgen/asset.ts` | `Asset { body, glow }` + `buildAsset` — splits shaded body from emissive glow geometry |
+| `src/render/meshgen/track.ts` | `buildPiece(type): Asset` for each of the 10 `PieceType`s |
+| `src/render/meshgen/rollingstock.ts` | `makeLocomotive(color)`, `makeCarriage(kind, color)` → `Asset` |
+| `src/render/meshgen/structures.ts` | `makeStation(awningColor)`, `makeTree`, `makeHouse`, `makeLamp` → `Asset` |
+| `src/render/postfx.ts` | selective bloom (`BLOOM_LAYER`) — only emissive `glow` geometry blooms |
+
+## 3. World constants (`palette.ts`)
+
+- `CELL = 2.0` world units per grid cell. All piece geometry is authored in world units
+  around a cell centered at the origin (N = −Z, S = +Z, E = +X, W = −X; ports at edge
+  midpoints, matching the port table in docs/30 §5).
+- `HEIGHT_UNIT = 1.0` world units per elevation level (ramps rise one unit; bridge decks sit
+  at `HEIGHT_UNIT`).
+- `PALETTE` holds every color as a named hex (rails, ties, ballast, grass, persona liveries,
+  structure and prop colors). Biome tinting (§5) multiplies instance colors against these.
+
+## 4. Track generation (`track.ts`)
+
+`buildPiece(type: PieceType): Asset` returns a shaded body (+ optional glow) per piece, built
+from a piece-local `Curve` plus rails/ties/ballast and any kitbash extras:
+
+| PieceType | Curve | Extras |
 |---|---|---|
-| Full track (ballast + rails) | 18 | `railroad-straight*`, `railroad-curve`, `railroad-corner-{small,large}[-ramp]`, `railroad-straight-{bend[-large],bump-{up,down},hill-*,skew-*}` |
-| Rail-only variants | 18 | same set as `railroad-rail-*` (no ballast base — used elevated, §3) |
-| Spline/track primitives | 7 | `spline-segment`, `spline-track[-damaged]`, `track[-single][-detailed]` |
-| Locomotives | 23 | `train-locomotive-{a,b,c}`, `-passenger-{a,b}`, `train-diesel-{a,b,c}[-box]`, `train-electric-{bullet,city,double,square,subway}-{a,b,c}`, `train-tram-{classic,modern,round}` |
-| Carriages | 12 | `train-carriage-{box,coal,dirt,wood,lumber,flatbed[-wood],tank[-large],container-{blue,green,red}}` |
-| Other | 2 | `train-connector`, `Textures/colormap.png` |
+| `straight` | line N→S | ballast + ties |
+| `curve-small` | quarter arc N→E, r = CELL/2 | ballast + ties |
+| `curve-large` | quarter arc N→E, r = 1.5·CELL (2×2 footprint) | ballast + ties |
+| `s-bend` | catmull S, +1 cell lateral over 2 cells | ballast + ties |
+| `s-bend-left` | `mirrorAssetX(s-bend)` | mirror across X |
+| `skew` | catmull sharp lane change, +1 cell over ~1 cell | ballast + ties |
+| `skew-left` | `mirrorAssetX(skew)` | mirror across X |
+| `ramp` | line rising `HEIGHT_UNIT` over one cell | ballast + ties |
+| `curve-small-ramp` | quarter arc N→E rising `HEIGHT_UNIT` (`arcCurve` yEnd) | ballast + ties |
+| `curve-large-ramp` | wide quarter arc rising `HEIGHT_UNIT` (2×2) | ballast + ties |
+| `hill` | catmull crest over 2 cells (`jumpCapable`) | ballast + ties |
+| `bump` | short catmull crest, 1 cell (`jumpCapable`) | ballast + ties |
+| `bridge` | ramp-up → deck at `HEIGHT_UNIT` → ramp-down (3 cells) | wood railings/posts + stone piers & abutments; shown over water |
+| `tunnel` | line N→S at ground | grassy mound (hemisphere) + a stone portal at each end |
+| `junction` | line N→S + arc N→E sharing the N port | lever post + glowing signal (bloom) |
+| `crossing` | line N→S + line W→E | plank deck plate at the shared cell |
 
-**Not present** (the gap this doc resolves in §3): bridge, tunnel, junction, crossing,
-station, buildings, people, foliage, particles.
+Rails: two swept `boxProfile` rails at ±gauge/2; ballast: a swept low wide bed; ties:
+frame-oriented boxes placed at fixed arc-length intervals via `sampleFrames`. Because the
+sweep uses the piece's own curve, each piece's rails terminate exactly on its ports — this is
+the sim-mesh parity that motivates the whole approach (verified visually top-down and by the
+curve unit tests, `src/core/curves.test.ts`).
 
-## 2. Piece → model mapping (normative, → `data/assets.json`)
+## 5. Rolling stock, structures, props
 
-| PieceType (30 §4) | Model(s) | Notes |
-|---|---|---|
-| `straight` | `railroad-straight` | the CELL_SIZE reference model (§5) |
-| `curve-small` | `railroad-corner-small` | 1×1 quarter turn |
-| `curve-large` | `railroad-corner-large` | 2×2 quarter turn |
-| `ramp` | `railroad-corner-small-ramp` (curved) / `railroad-straight-hill-beginning`+`-end` pair (straight rise) | authoring picks per PieceDef path |
-| `hill` | `railroad-straight-hill-complete` (2 cells) | rises and falls; `jumpCapable` at crest |
-| `bump` | `railroad-straight-bump-up` + `-bump-down` composed | `jumpCapable` |
-| `bridge` | **kitbash** §3.1 | |
-| `tunnel` | **kitbash** §3.2 | |
-| `junction` | **kitbash** §3.3 | |
-| `crossing` | **kitbash** §3.4 | |
-| station (fixed) | **kitbash/kit** §3.5 | not a tray piece |
+- **`makeLocomotive(bodyColor)`** — chunky toy steam engine: swept-frame base, cylindrical
+  boiler, cab with window insets, chimney + brass dome, headlight, cowcatcher wedge, three
+  wheel pairs, couplers. Length along +Z so it drops onto N-S track.
+- **`makeCarriage(kind, color)`** — `kind ∈ container | passenger | tank | flatbed`. `color`
+  is the persona livery (docs/20 §3: commuter blue, kid red, elder green, musician violet,
+  doctor white, engineer amber). Passenger cars get a window band; tank cars a horizontal
+  cylinder + hatch; flatbeds corner stakes.
+- **`makeStation(awningColor)`** — platform slab + plank cap + posts + awning + fascia +
+  trackside signboard + bench. Per-biome awning tint.
+- **Props** (`structures.ts` + `props.ts`) — `makeTree` (stacked cones), `makeHouse`,
+  `makeLamp`, plus biome variants: `makeRoundTree`, `makeSnowFir`, `makeCactus`, `makeRock`,
+  `makeMushroom(glowing)` (the glowing cap routes to the bloom layer). `biomes.ts` `BIOMES`
+  maps each biome id → `{ ground, accent, props[] }` — the data the game reads to dress a
+  stage's terrain (ground/accent tint props & ground, never track — docs/30 §9).
 
-Unused-by-v1 track models (`bend`, `skew`, `spline-*`, `track*`) stay in the repo; `skew`
-pairs are earmarked for a possible parallel-tracks piece in W8.
+**People:** no character meshes. Personas are the livery-colored carriages above plus floating
+icon billboards (§6); payoff "crowds" are icon billboards on capsule bodies (docs/60 §3.6 of
+v1 carried forward). This keeps the roster style-proof and adds zero assets.
 
-Train models: campaign defaults `train-locomotive-a/b/c` (W1), `-passenger-a/b` (W2+),
-`train-diesel-*` (W3+); electrics/trams/subways unlock as W8 content and are valid in any
-`trains[].model` today (the manifest exposes all locomotives). Carriage models are chosen by
-**persona**, not by scenario — mapping normative in 20 §3.
+## 6. Icons
 
-## 3. Missing-model resolution
+Persona/UI icons are drawn to a canvas at runtime (shapes + text via Canvas2D) and used as
+`CanvasTexture` sprites — the same technique the asset lab uses for its labels. One atlas
+canvas covers all persona ids in two variants (colored + high-contrast glyph for the
+colorblind setting, docs/10 §10). No image files.
 
-Two-track strategy per the user decision: **(a)** preferred model from an added Kenney CC0
-kit (user downloads from kenney.nl; exact kit names confirmed at download time — candidates
-in 20 §1), **(b)** a procedural kitbash recipe using only the train kit + generated geometry
-tinted from `colormap.png` palette swatches. **v1 implementation must build the kitbash
-recipes first** — kits then upgrade visuals as pure `assets.json` swaps, with no code change.
+## 7. Audio
 
-All generated geometry samples its vertex colors/UVs from designated colormap swatches
-(wood, stone, metal — swatch UV coordinates recorded in `data/assets.json` at M0 audit) so
-kitbashed pieces are indistinguishable in style and share the single material (§5).
+Audio is the one category that is not geometry. Options, in preference order: (a) synthesized
+at runtime via WebAudio (oscillator/noise + envelopes) for stings, chimes, whistle, and crash
+gags — keeps the "zero asset files" property intact; (b) a small set of CC0 `.ogg` clips if
+synthesis proves insufficient for music beds, which would be the only binary files in the
+build and must be explicitly approved (CLAUDE.md dependency-style decision). v1 target: **(a)
+synthesized**, with the event→sound table from docs/10 §11 realized as WebAudio patches. This
+is a later milestone (docs/70 M9.4) and does not affect the no-binary-assets test if (a) holds.
 
-### 3.1 Bridge
-`railroad-rail-straight` (rail-only, no ballast) at height 1 + procedural trestle: two
-A-frame leg pairs (boxes, wood swatch) at cell edges + side rails. Over water, legs get a
-stone footing block. Height-2 (W8): stack a second leg tier.
+## 8. Testable invariants
 
-### 3.2 Tunnel
-Legal only through a `rock`/height-≥1 cell (30 §5): procedural portal arch (half-torus +
-keystone box, stone swatch) at each open face; track inside is `railroad-rail-straight`;
-the terrain mound itself hides the train (`covered` tag: renderer fades the roof when the
-camera looks straight down).
-
-### 3.3 Junction
-Kitbash merge of `railroad-straight` + `railroad-curve` geometry in one cell + a procedural
-lever/signal post (metal swatch) whose flag flips with switch state (the tap target,
-30 §5 — min 44 px projected, 30 §12).
-
-### 3.4 Crossing
-Two `railroad-rail-straight` meshes crossed at 90° + a procedural plank deck (wood swatch)
-where they intersect. With a `crossingTraffic` hazard, add procedural gate arms that animate
-with the hazard cycle (render reads the deterministic hazard clock; no sim state added).
-
-### 3.5 Station
-Procedural platform slab + 4 posts + awning (biome-tinted canvas swatch) beside the track
-cell + a name signboard. Upgrade path: building props from the biome's kit placed behind the
-platform (pure manifest data: `station.props[biome] = [assetId...]`).
-
-### 3.6 People
-**No people meshes.** Personas are persona-colored carriages (20 §3) + floating icon
-billboards (one 8-icon SVG-rendered-to-canvas atlas, shape-coded per 10 §10). In payoffs,
-"people" are the same icon billboards on capsule bodies hopping about — chunky and legible,
-and style-proof against any future kit.
-
-### 3.7 Payoff & map props
-Per-payoff prop sets (10 §6) start procedural (lamp = pole + emissive sphere; bunting =
-catmull line + triangles; confetti/particles in `effects/`) and upgrade from added kits via
-manifest swaps. Same for world-map node dioramas.
-
-## 4. Manifest — `data/assets.json` (normative shape)
-
-```json
-{
-  "cellSize": 0.0,                       // world units; measured at M0 from railroad-straight bounds
-  "colormap": "kenney-train-kit/Models/GLB/Textures/colormap.png",
-  "swatches": { "wood": [0.0, 0.0], "stone": [0.0, 0.0], "metal": [0.0, 0.0] },
-  "models": {
-    "railroad-straight": { "file": "kenney-train-kit/Models/GLB/railroad-straight.glb",
-                            "kind": "track", "footprint": [[0,0]], "yawOffset": 0 },
-    "train-locomotive-a": { "file": "...", "kind": "locomotive", "length": 0.0 }
-  },
-  "procedural": { "bridge": "trestle-v1", "tunnel": "portal-v1", "junction": "lever-v1",
-                   "crossing": "deck-v1", "station": "platform-v1" },
-  "personaIcons": "generated:persona-atlas-v1",
-  "audio": { "dispatch-whistle": "audio/dispatch.ogg" }
-}
-```
-
-Every `PieceDef.model`, `trains[].model`, persona carriage, and `payoff.jingle` must resolve
-here. `kind` drives loader handling; `length` (locos/carriages) feeds `CARRIAGE_SPACING`
-sanity checks.
-
-## 5. Conventions (checked by the M0 audit script for every kit, present and future)
-
-- **Units/scale:** `cellSize` = X-extent of `railroad-straight` bounds; every track model
-  must fit its declared footprint × cellSize within 2% (audit-enforced). New kits get a
-  per-kit `scaleFactor` in the manifest if their unit differs.
-- **Axes/pivot:** Y-up, model "forward" = −Z at `yawOffset: 0`; pivot at footprint center,
-  base at y=0. Deviations recorded as per-model `yawOffset`/`pivotOffset` rather than
-  re-exporting GLBs (repo assets are treated as read-only upstream files).
-- **Material:** exactly one material for all kit + procedural geometry (30 §9 instancing
-  budget). Kits with their own colormaps: atlas them into one texture at audit time
-  (script-generated combined colormap + UV remap manifest entry) or, if trivial, retint to
-  swatches. Audit fails the build if a loaded scene produces > 1 material.
-- **Naming:** manifest ids are the GLB basename; procedural assets are `name-vN`.
-- **Loading:** all GLBs loaded up-front at boot behind the title screen (v1 total is small);
-  budget: ≤ 4 MB gzipped models, ≤ 2 s parse on desktop reference hardware.
-
-## 6. Persona icon atlas
-
-Generated at build time from inline SVG (no binary art assets): briefcase, kite, yarn ball,
-eighth-note, cross, wrench + star + heart. Two variants: colored (persona accent) and
-high-contrast glyph (colorblind setting, 10 §10). One 512×512 canvas atlas → one texture for
-all billboards.
-
-## 7. Biome palettes
-
-Ground/prop instance tints per biome (track never tinted — 30 §9). Accent colors from 20 §1
-table; full 10-biome palette (`ground`, `accent`, `sky`, `fog`) lives in `data/biomes.json`,
-authored at M3 under one contrast rule: station signboard text ≥ 4.5:1 against its board in
-every biome.
-
-## 8. Audio assets
-
-Source: Kenney CC0 audio packs (candidates: "Interface Sounds", "Music Jingles",
-"Impact Sounds" — confirm at kenney.nl, same policy as model kits). Event → sfx table
-(→ `data/assets.json audio`): countdown tick(-tock accelerando), dispatch whistle (signature,
-10 §11), piece place/remove, junction clack, boarding chime, delivery chime (per-persona
-pitch), airtime whoosh, crash suite per `CrashCause` (slide-whistle, accordion, boing,
-distant honk), payoff jingles per `payoff.type` (5), map restoration hum, UI tick. Music:
-one loop per biome (3 in v1) + title. Total audio budget ≤ 3 MB.
-
-## 9. Testable invariants
-
-- **Manifest completeness:** every `PieceType`, every campaign `trains[].model`, every
-  persona carriage (20 §3), every `payoff.jingle` referenced by shipped scenarios resolves to
-  an existing file or registered procedural generator (unit test over `data/*.json` +
-  `src/scenarios/*`).
-- **Audit gates:** cellSize measured > 0; every track model within 2% of footprint; single
-  material after load; per-piece triangle count ≤ 4k (procedural pieces ≤ 2k).
-- **Boot budget:** models ≤ 4 MB gz / audio ≤ 3 MB (size test in CI).
-- **Icon atlas:** contains all persona ids in `data/personas.json` in both variants
-  (generated-output test).
+- **No binary assets:** a test globs the repo (excluding `docs/`, `node_modules/`, `dist/`)
+  and asserts zero `.glb/.gltf/.png/.jpg/.jpeg/.ktx/.fbx/.obj` files.
+- **Single material / attribute shape:** every `buildPiece`, `makeLocomotive`,
+  `makeCarriage`, and structure returns a geometry with exactly `{position, normal, color}`,
+  non-indexed, no `uv` (unit test over all generators).
+- **Merge safety:** building all 10 pieces + all rolling stock never throws (the mismatched-
+  attribute merge failure is regression-tested).
+- **Curve/port parity:** each track piece's swept rail endpoints coincide with its port
+  positions within 1e-4·CELL (drives from `src/core/curves.test.ts` endpoints).
+- **Budgets:** ≤ 4k triangles per track piece, ≤ 2k per kitbash extra, ≤ 6k per locomotive;
+  full campaign scene ≤ 250k triangles, ≤ 150 draw calls via `InstancedMesh` per piece type
+  (docs/30 §9). The lab reports the live triangle total for spot checks.

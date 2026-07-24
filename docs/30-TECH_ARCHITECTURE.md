@@ -37,9 +37,10 @@ src/
   track/        # HEADLESS piece definitions, placement validation, track graph, splines/LUTs.
   train/        # HEADLESS train movement, arcade physics, crash detection.
   data/         # Static data as typed JSON: pieces.json, physics.json, personas.json,
-                #   assets.json, worldmap.json, biomes.json + TS loaders/validators.
+                #   worldmap.json, biomes.json + TS loaders/validators.
   scenarios/    # Shipped scenario JSON files (see 40-SCENARIO_SCHEMA.md) + validateScenario().
-  render/       # Three.js scene, GLTF loading, instancing, biome tinting, payoff sequences.
+  core/curves + render/meshgen/   # Procedural asset generation (see 60-ASSET_PIPELINE.md).
+  render/       # Three.js scene, procedural meshgen, instancing, biome tinting, payoff sequences.
   camera/       # Orbit rig, framing, payoff dolly moves.
   effects/      # Particles, confetti, crash gags (render-only, may be non-deterministic).
   audio/        # WebAudio wrapper, event→sfx mapping table.
@@ -103,7 +104,9 @@ export interface CellCoord { x: number; z: number }   // integer grid coords, x�
 
 // track/pieces.ts — one PieceDef per PieceType, loaded from data/pieces.json
 export type PieceType =
-  | 'straight' | 'curve-small' | 'curve-large' | 'ramp' | 'hill'
+  | 'straight' | 'curve-small' | 'curve-large'
+  | 's-bend' | 's-bend-left' | 'skew' | 'skew-left'
+  | 'ramp' | 'curve-small-ramp' | 'curve-large-ramp' | 'hill'
   | 'bump' | 'bridge' | 'tunnel' | 'junction' | 'crossing';
 
 export interface Port { cell: CellCoord; edge: Direction; height: HeightLevel } // piece-local
@@ -119,7 +122,7 @@ export interface PieceDef {
   footprint: CellCoord[];           // piece-local cells occupied (straight=[{0,0}], curve-large=2x2, …)
   ports: Port[];
   paths: PathDef[];                 // junction has 3 ports / 2 paths + switch; crossing 4 ports / 2 independent paths
-  model: AssetId;                   // see data/assets.json, 60-ASSET_PIPELINE.md
+  model: AssetId;                   // meshgen builder key (60-ASSET_PIPELINE.md §4), not a file
   tags: ('jumpCapable' | 'switch' | 'elevated' | 'covered')[];
 }
 
@@ -199,13 +202,14 @@ type-check and validate).
 
 ## 5. Track model
 
-- The stage is a `grid.width × grid.height` field of *cells*. One cell = the footprint of one
-  Kenney track module. `CELL_SIZE` (world units per cell) is measured from
-  `railroad-straight.glb` bounds in the M0 asset audit and recorded in `data/assets.json`;
-  all piece paths are authored in cell units and scaled by it.
+- The stage is a `grid.width × grid.height` field of *cells*. One cell = one track module
+  footprint. `CELL` (world units per cell, = 2.0) is a constant in
+  `render/meshgen/palette.ts`; all piece paths and geometry are authored in world units around
+  a cell centered at the origin (60 §3).
 - Terrain per cell: `height: HeightLevel` and optional feature `water | rock | forest | town`.
-  Track requires port `height` to match terrain height unless the piece is `elevated` (bridge)
-  or `covered` (tunnel, which requires `rock`/hill terrain above).
+  Track requires port `height` to match terrain height unless the piece is `elevated` (bridge —
+  brings its own approach ramps + deck) or `covered` (tunnel — brings its own mound; may also be
+  placed under existing `rock`/hill terrain).
 - **Placement validity** (all must hold): footprint cells in bounds; footprint cells not
   occupied by another placement, a station, or blocking terrain (`water`/`rock` unless
   bridge/tunnel); every piece port that touches an occupied neighbor edge must align with a
@@ -233,13 +237,32 @@ Port table (piece-local, rotation 0; heights 0 unless noted):
 | straight | (0,0) | N(0,0), S(0,0) |
 | curve-small | (0,0) | N(0,0), E(0,0) |
 | curve-large | (0,0)(1,0)(0,1)(1,1) | N(0,0), E(1,1) |
+| s-bend | (0,0)(0,1)(1,0)(1,1) | N(0,0)@0, S(1,1)@0 (lateral shift +1 cell right; ports provisional until M2) |
+| s-bend-left | (0,0)(0,1)(1,0)(1,1) | mirror of s-bend (shift −1 cell left) |
+| skew | (0,0)(1,0) | N(0,0)@0, S(1,0)@0 (sharp lane change +1 cell right; ports provisional until M2) |
+| skew-left | (0,0)(1,0) | mirror of skew (shift left) |
 | ramp | (0,0) | N(0,0)@h, S(0,0)@h+1 |
+| curve-small-ramp | (0,0) | N(0,0)@h, E(0,0)@h+1 (turns and climbs one level) |
+| curve-large-ramp | (0,0)(1,0)(0,1)(1,1) | N(0,0)@h, E(1,1)@h+1 (wide turn + climb) |
 | hill | (0,0)(0,1) | N(0,0)@0, S(0,1)@0 (path rises over a bump, `jumpCapable`) |
 | bump | (0,0) | N(0,0), S(0,0) (`jumpCapable`) |
-| bridge | (0,0) | N(0,0)@1, S(0,0)@1 (`elevated`; legal over water/track) |
-| tunnel | (0,0) | N(0,0)@0, S(0,0)@0 (`covered`; legal only through rock/hill cell) |
+| bridge | (0,0)(0,1)(0,2) | N(0,0)@0, S(0,2)@0 (`elevated`; integral ramps up to a height-1 deck; crosses water/track in the middle cell) |
+| tunnel | (0,0) | N(0,0)@0, S(0,0)@0 (`covered`; a mound with a portal at each end — track passes through) |
 | junction | (0,0) | N(0,0), S(0,0), E(0,0) (`switch`; paths N↔S, N↔E) |
 | crossing | (0,0) | N,S,E,W (paths N↔S, E↔W, independent) |
+
+Turn direction: 90° curves (flat and ramped) need no mirror — their four rotations already give
+both left and right turns (N–E, E–S, S–W, W–N), and a train runs a piece in either direction
+(so a ramp is both an incline and a decline). Only the chiral pieces are handed: hence
+**s-bend/s-bend-left** and **skew/skew-left** (mirror pairs).
+
+Piece function reference: **straight/curve-small/curve-large** route on the flat;
+**s-bend/skew** (+ their `-left` mirrors) shift a line sideways by one lane;
+**ramp/curve-small-ramp/curve-large-ramp**
+change height by one level (straight or while turning); **hill/bump** rise and fall over their
+span (`jumpCapable`); **bridge** carries a line up-and-over a water/track gap via integral
+approach ramps; **tunnel** carries a line through a hill; **junction** is a switchable Y;
+**crossing** lets two lines cross at 90° without connecting.
 
 ## 6. Splines and train movement
 
@@ -356,9 +379,10 @@ examples in 20 §3.1 exactly.
 
 ## 9. Rendering
 
-- **Loading:** GLTFLoader reads `data/assets.json` (manifest: id → file, footprint, scale —
-  see 60 §5). All models share `colormap.png`; enforce a single shared `MeshStandardMaterial`
-  (flat-shaded look, no env maps) so every piece type can be an `InstancedMesh`.
+- **Assets:** all geometry is generated at runtime by `render/meshgen/` (see
+  60-ASSET_PIPELINE.md) — no model or texture files. Every mesh carries a `color` vertex
+  attribute and renders through a single shared flat-shaded `MeshStandardMaterial`
+  (`vertexColors: true`, no env maps) so every piece type can be an `InstancedMesh`.
 - **Budgets:** ≤ 150 draw calls, ≤ 250k triangles, 60fps on a 2020 mid-range laptop iGPU;
   30fps floor on mobile (§12). One directional light + ambient; soft blob shadows
   (texture decal), not shadow maps, on low tier.

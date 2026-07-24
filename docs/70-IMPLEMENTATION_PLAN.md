@@ -49,24 +49,23 @@ commands. ~Half-day scope each.
 
 ### M0 — Scaffold (2 tasks)
 
-**M0.1 Project scaffold.**
-A: `package.json`, `tsconfig.json`, `vite.config.ts`, `.eslintrc.cjs`, `.prettierrc`,
-`index.html`, `src/app/main.ts` (hello-cube), `.github/workflows/ci.yml`, `.gitignore`.
-F: everything under `docs/`, `kenney-train-kit/`.
-Reuse: 30 §1 stack + canonical commands; record pinned `three` major in 30 §1 table.
-AC: all five npm scripts run; CI workflow runs typecheck+lint+test+build on push; ESLint
+**M0.1 Project scaffold.** *(largely DONE — see repo)*
+A: `package.json`, `tsconfig.json`, `vite.config.ts`, `index.html`, `.gitignore` (exist);
+remaining: `.eslintrc`/`eslint.config`, `.prettierrc`, `.github/workflows/ci.yml`,
+`src/app/main.ts` (wire the loop cube).
+Reuse: 30 §1 stack + canonical commands; `three` pinned at `^0.169` (record in 30 §1).
+AC: all npm scripts run; CI workflow runs typecheck+lint+test+build on push; ESLint
 `no-restricted-imports` headless-zone rule (30 §2.1) present with a fixture violation test.
-V: `npm run dev` serves a spinning cube; CI green on the branch.
+V: `npm run dev` serves the app; CI green on the branch.
 
-**M0.2 Asset audit script.**
-A: `scripts/audit-assets.mjs`, `data/assets.json` (generated + hand-annotated), `src/data/assets.ts` (typed loader).
-F: `src/render/*` (no renderer yet).
-Reuse: 60 §4 manifest shape, 60 §5 conventions.
-AC: script walks `kenney-train-kit/`, measures `cellSize` from `railroad-straight`, emits
-manifest entries for all 85 GLBs with bounds; fails (nonzero exit) on the 60 §5 gates;
-manifest passes the 60 §9 completeness test for `PieceType` stubs (kitbash entries as
-`procedural`). Swatch UVs for wood/stone/metal recorded.
-V: `node scripts/audit-assets.mjs` output diff-stable across two runs.
+**M0.2 Procedural meshgen foundation.** *(DONE — this is the Phase-2 build)*
+A (exist): `src/core/{math,curves}.ts`, `src/render/meshgen/{palette,sweep,track,rollingstock,structures}.ts`,
+`src/lab/main.ts`, `src/core/curves.test.ts`.
+Reuse: 60 (procedural spec), 30 §6 curves.
+AC: `buildPiece` generates all 16 `PieceType`s; `makeLocomotive`/`makeCarriage`/`makeStation`
++ props build without throwing; one shared vertex-color material; curve endpoint tests green;
+the asset lab renders the full set. This module is the basis M3 builds instancing on.
+V: `npm run test` green; `npm run build` green; asset lab screenshots render all pieces.
 
 ### M1 — Core primitives (2 tasks)
 
@@ -87,8 +86,8 @@ pausable/single-steppable (assist mode + tests need this).
 
 **M2.1 Piece definitions.**
 A: `data/pieces.json`, `src/track/pieces.ts` + tests.
-Reuse: 30 §4 `PieceDef`, 30 §5 port table (the data), 60 §2 model ids.
-AC: all 10 `PieceType`s defined; T-1 rotation round-trip; T-2 port table fixture equality.
+Reuse: 30 §4 `PieceDef`, 30 §5 port table (the data), 60 §4 meshgen builder keys.
+AC: all 16 `PieceType`s defined; T-1 rotation round-trip; T-2 port table fixture equality.
 
 **M2.2 Placement + validation.**
 A: `src/track/placement.ts` + tests.
@@ -106,24 +105,36 @@ AC: T-3 add/remove restores graph; `edgesFrom` honors switch states; `shortestPa
 
 ### M3 — Render foundation (3 tasks) [parallel with M2]
 
-**M3.1 GLTF loading + instancing.**
-A: `src/render/{loader,scene,instances}.ts`, `src/app/main.ts`.
-Reuse: 60 §4 manifest, 30 §9 budgets.
-AC: loads manifest, one shared material asserted at runtime (dev-mode throw), an
-`InstancedMesh` per model id; demo scene draws 500 straights ≤ 5 draw calls.
+**M3.1 Procedural instancing + scene.** *(DONE — `src/render/instances.ts` + `materials.ts`)*
+A (exist): `src/render/instances.ts` (`TrackInstances`), `src/render/materials.ts` (shared
+body + glow materials), `src/lab/layout.ts` (demo), `src/render/instances.test.ts`.
+Reuse: `render/meshgen/*` (M0.2), 30 §9 budgets.
+AC: builds each piece geometry once via `buildPiece`; one shared body material + one glow
+material across all types; an `InstancedMesh` per `PieceType` (+ per glow type); `place()`
+writes transform + biome tint via `instanceColor`. Verified: 500 straights = 1 draw call; a
+one-of-each 16-type board = 17 draw calls (tests). Lab `?view=layout` renders it.
+Remaining for a later pass: fold into the real game `scene.ts` + camera rig (M3.2).
 
-**M3.2 Camera rig + grid picking.**
-A: `src/camera/rig.ts`, `src/app/input.ts`, `src/render/picking.ts`.
-Reuse: 30 §12 input table (desktop rows), 30 §9.
-AC: orbit/pan/zoom with clamps; raycast → `CellCoord` picking with a hover highlight;
-touch pan/pinch functional (no polish).
+**M3.2 Camera rig + grid picking.** *(DONE)*
+A (exist): `src/camera/rig.ts` (`createCameraRig` — OrbitControls with clamps + builder mouse/
+touch mapping), `src/render/picking.ts` (`pickGround`/`pickCell` → `CellCoord`, hover
+highlight), `src/app/input.ts` (`attachBuildInput`: hover/place/remove/rotate/select),
+`src/render/picking.test.ts`, lab `?view=build` interactive demo.
+Reuse: 30 §12 input table, 30 §9.
+AC: orbit/pan/zoom with clamps; raycast → `CellCoord` (tested headlessly incl. sky-miss →
+null); hover highlight; left-click place / right-click remove / R rotate / 1–9 select;
+touch pan/pinch mapped.
 
-**M3.3 Procedural kitbash pieces + station.**
-A: `src/render/kitbash.ts` + snapshot tests (geometry counts), `data/assets.json` (procedural entries).
-Reuse: 60 §3 recipes, swatch UVs from M0.2.
-AC: bridge/tunnel/junction/crossing/station generators produce ≤ 2k tris each, share the
-material, and register under the `procedural` manifest keys; junction lever has a named
-node for the flip animation and tap target.
+**M3.3 Meshgen polish + biome props.** *(DONE except junction-lever animation node)*
+A (exist): `src/render/meshgen/props.ts` (round-tree, snow-fir, cactus, rock, glowing/plain
+mushroom), `src/render/meshgen/biomes.ts` (`BIOMES` dressing table: ground/accent + prop
+factories per biome), `src/render/meshgen/generators.test.ts`, lab `?view=props` showcase.
+Reuse: 60 §4–5, existing generators.
+AC: per-biome prop variants added (60 §5, 20 §1 dressing); regression test that every
+generator (16 pieces + rolling stock + structures + props + biome factories) builds a
+well-formed `{position,normal,color}` non-indexed asset and never throws. **Deferred to M6.2**
+(junction interaction): expose the junction lever as a named node for the flip animation — it
+is currently baked into the piece glow, which is right for instancing but not yet animatable.
 
 ### M4 — Train sim + physics, headless (4 tasks)
 
@@ -255,9 +266,10 @@ assert the other manually in review).
 fixture crashes with `gap`.
 **M9.3 World 3 scenarios** (8, two-train; w3-s7 = completed example B). AC: gate green;
 every `payoff.type` now used ≥ 1× (10 §13 check becomes part of M5.4 gate).
-**M9.4 Audio pass.** A: `src/audio/*`, `data/assets.json` audio, `audio/` files (Kenney CC0,
-user-added). Reuse: 60 §8 table, 10 §11. AC: every 60 §8 event wired; budget test; mute/vol
-settings.
+**M9.4 Audio pass.** A: `src/audio/*` (WebAudio synthesis). Reuse: 60 §7 event→sound table,
+10 §11. AC: every event synthesized at runtime (oscillator/noise + envelopes) — no audio
+files in the default build; mute/vol settings; if a music bed needs a clip, that is an
+explicit human-approved exception (60 §7).
 **M9.5 Mobile & perf pass.** A: `src/ui/*.css`, `src/app/input.ts`, `src/render/quality.ts`.
 Reuse: 30 §12. AC: touch table fully implemented; 44 px targets audit; HUD reflow ≤ 700 px;
 quality tiers auto-select; 30 fps floor on reference mobile (manual measurement recorded in PR).
@@ -277,7 +289,7 @@ quality tiers auto-select; 30 fps floor on reference mobile (manual measurement 
 
 | Risk | Exposure | Mitigation |
 |---|---|---|
-| Kenney model scale/pivot ≠ assumptions | M2/M3 rework | M0.2 audit is a *blocking* first task; `cellSize`/offsets are data, not constants |
+| Procedural look doesn't hold across all pieces/biomes | visual quality | generators built & screenshot-reviewed (M0.2 done); `PALETTE`/`CELL` centralized so retuning is one file; iterate via the asset lab |
 | Cross-browser float divergence breaks determinism claims | replay/V6 trust | CI is the single verification platform; V6 verifies at import time on the *player's* machine (10 s cap), not against remote hashes; hashes quantize via `toFixed(9)` |
 | Junction switch tap UX unclear at speed | M6.2 | lever kitbash has oversized tap target; assist mode pause; playtest checkpoint G5 |
 | Kid/elder quirk edge cases (multi-train boarding order) | M5.3 | boarding rule pinned in 20 §3; property tests over random boarding orders |

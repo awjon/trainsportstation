@@ -3,7 +3,8 @@
 Doc version: 1.0.0 · Start here.
 
 **Trainsportstation** is a whimsical real-time 3D railroad puzzle game (Three.js +
-TypeScript + Kenney assets). You get 10–15 seconds to lay track before your trains
+TypeScript, all art generated procedurally in code — no model or texture files). You get
+10–15 seconds to lay track before your trains
 auto-depart; deliver people, reconnect communities, earn **Connections**, restore the world
 map, and enjoy the crashes when you don't. Pillars: Nintendo-style accessibility ·
 fun-first arcade physics · Build → Watch → Retry · multiple valid solutions · data-driven
@@ -18,7 +19,7 @@ content · community scenarios.
 | [30-TECH_ARCHITECTURE.md](30-TECH_ARCHITECTURE.md) | writing any code — modules, canonical interfaces, determinism, physics, rendering, save, mobile |
 | [40-SCENARIO_SCHEMA.md](40-SCENARIO_SCHEMA.md) | touching scenario/replay/save/share JSON in any way |
 | [50-EDITOR_SPEC.md](50-EDITOR_SPEC.md) | building the editor or community-content features |
-| [60-ASSET_PIPELINE.md](60-ASSET_PIPELINE.md) | loading models, adding Kenney kits, kitbash pieces, audio, icons |
+| [60-ASSET_PIPELINE.md](60-ASSET_PIPELINE.md) | generating meshes in code (track, trains, structures, props), icons, audio |
 | [70-IMPLEMENTATION_PLAN.md](70-IMPLEMENTATION_PLAN.md) | orchestrating or executing the build — task contracts, DAG, gates |
 
 Root files `Trainsportstation_GDD_v1.1.md` and `ARCHITECTURE.md` are superseded seeds kept
