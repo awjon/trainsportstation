@@ -1,11 +1,15 @@
-// Train kinematics (docs/30 §6, docs/70 M4.2). HEADLESS — zero three.js/render/DOM imports
+// Train kinematics (docs/30 §6, §7.1; docs/70 M4.2). HEADLESS — zero three.js/render/DOM imports
 // (docs/30 §2.1). This file moves an on-rails train along the TrackGraph one tick at a time and
 // resolves piece-local poses (see the `Pose` doc comment below — NOT world-space, a deliberate
 // scope call, flagged as a known risk in the M4.2 report) for the locomotive and its trailing
-// carriages. It does NOT do the §7.1 acceleration model, jumps, derails, or collisions — that is
-// M4.3 (train/physics.ts) and M4.4 (train/stations.ts). The one exception is the dead-end "soft
-// stop" (v -> 0 at v <= vCrawl) which docs/30 §6 describes as a kinematic boundary condition, not
-// part of the §7.1 formula.
+// carriages. It DOES implement the §7.1 longitudinal/acceleration model (vTarget/a/v' below) —
+// that was originally miscontracted to M4.3, but docs/70's M4.3 "Reuse" line starts at §7.2,
+// meaning §7.1 (the only thing that makes v actually converge rather than being a fixed input)
+// was always this file's job; corrected in a same-branch follow-up to the initial M4.2 delivery.
+// It does NOT do jumps, derails, or collisions (§7.2-7.4) — that is M4.3 (train/physics.ts) and
+// M4.4 (train/stations.ts). The one exception within the dead-end handling is the "soft stop"
+// (v -> 0 at v <= vCrawl) which docs/30 §6 describes as a kinematic boundary condition, applied
+// as an override *after* the §7.1 update, not part of the §7.1 formula itself.
 //
 // --- facing (read docs/70's M4.2 task contract before changing this) ---
 // `compilePath` always parameterizes a path in its own fromPort->toPort direction and has no
@@ -27,7 +31,7 @@ import type { PieceType } from '../track/pieces';
 import { compilePath } from '../track/splines';
 import type { TrackEdge, TrackGraph } from '../track/graph';
 import type { TrainState } from './types';
-import { PHYSICS } from './physics-constants';
+import { PHYSICS, type SpeedBet } from './physics-constants';
 
 export interface AdvanceResult {
   /** New state — advanceTrain is a pure function; the input TrainState is never mutated. */
@@ -92,20 +96,25 @@ function trimHistory(history: string[], graph: TrackGraph, maxOffset: number): s
 }
 
 /**
- * Advance a single on-rails train by `dt` seconds of arc-length motion, handing off across edge
- * boundaries (`graph.edgesFrom`) and carrying leftover distance forward — never losing partial-
- * tick distance except at a genuine dead end or the iteration cap (see AdvanceResult/module doc).
+ * Advance a single on-rails train by `dt` seconds: first the §7.1 longitudinal/acceleration
+ * update to `v` (using the CURRENT edge's grade, i.e. the edge occupied at the START of this
+ * tick, before any handoff processing below — docs/70's correction is explicit that grade does
+ * NOT get re-read mid-tick even if the train hands off to a different-grade edge this same tick),
+ * then arc-length position integration using that updated `v`, handing off across edge boundaries
+ * (`graph.edgesFrom`) and carrying leftover distance forward — never losing partial-tick distance
+ * except at a genuine dead end or the iteration cap (see AdvanceResult/module doc).
  *
  * `pieceTypeOf` is intentionally NOT a parameter here: this function only ever reads
- * `edge.length`/`edge.to` from the graph (pure topology + arc-length), never a compiled path, so
- * it never needs to resolve a placement's PieceType. `locoPose`/`carriagePose` below DO need it
- * (to call `compilePath`), which is why they take it — see docs/70 M4.2 task contract for the
- * `pieceTypeOf` pattern this is built against.
+ * `edge.length`/`edge.to`/`edge.grade` from the graph (pure topology + arc-length + the §7.1
+ * grade term), never a compiled path, so it never needs to resolve a placement's PieceType.
+ * `locoPose`/`carriagePose` below DO need it (to call `compilePath`), which is why they take it —
+ * see docs/70 M4.2 task contract for the `pieceTypeOf` pattern this is built against.
  */
 export function advanceTrain(
   train: TrainState,
   graph: TrackGraph,
   switchStates: ReadonlyMap<number, 0 | 1>,
+  speedBet: SpeedBet,
   dt: number,
 ): AdvanceResult {
   // Airborne/crashed trains are M4.3's (physics.ts) responsibility to resume on-rails motion for
@@ -125,8 +134,18 @@ export function advanceTrain(
   // unambiguously non-undefined for the rest of the function.
   let edge: TrackEdge = startEdge;
 
-  let s = train.s + train.v * dt;
-  let v = train.v;
+  // --- §7.1 longitudinal model: vTarget = vBase * betMult(bet); a = aThrottle*sign(vTarget-v)
+  // - gSlope*grade - cDrag*v; v' = clamp(v + a*dt, 0, vHardMax) — applied to `v` BEFORE position
+  // integration (docs/30 §6: "with the physics update of §7 applied to v first"), using
+  // `startEdge.grade` (this tick's starting edge only, per the function doc above).
+  const vTarget = PHYSICS.vBase * PHYSICS.betMult[speedBet];
+  const a =
+    PHYSICS.aThrottle * Math.sign(vTarget - train.v) -
+    PHYSICS.gSlope * startEdge.grade -
+    PHYSICS.cDrag * train.v;
+  let v = Math.min(Math.max(train.v + a * dt, 0), PHYSICS.vHardMax);
+
+  let s = train.s + v * dt;
   const history = train.history.slice();
   let deadEndOverrun: number | null = null;
   let iterations = 0;
@@ -150,8 +169,9 @@ export function advanceTrain(
     if (options.length === 0) {
       s = edge.length;
       if (v <= PHYSICS.vCrawl) {
-        // Soft stop (docs/30 §6): a kinematic boundary condition, not the §7.1 acceleration
-        // model — the only place this file mutates `v` on its own.
+        // Soft stop (docs/30 §6): a kinematic boundary condition that overrides the §7.1
+        // acceleration result computed above, not a rule the formula itself expresses — this is
+        // the only place this file hard-sets `v` outside that formula.
         v = 0;
         deadEndOverrun = null;
       } else {
