@@ -21,7 +21,7 @@
 
 import { dist, dot, normalize, scale, vec, type Vec3 } from '../core/math';
 import type { Tick } from '../core/types';
-import { PIECE_DEFS, type CellCoord, type CurveClass, type PieceType } from '../track/pieces';
+import { CELL, PIECE_DEFS, type CellCoord, type CurveClass, type PieceType } from '../track/pieces';
 import { pieceLocalDirToWorld, pieceLocalToWorld } from '../track/placement';
 import { compilePath } from '../track/splines';
 import type { TrackEdge, TrackGraph } from '../track/graph';
@@ -180,11 +180,6 @@ function findLanding(
  * reference (the train never landed), so this rounds world x/z to the nearest cell index. An
  * approximation, not exact (documented per docs/70 M4.3's own allowance for this). */
 function groundCellApprox(pos: Vec3): CellCoord {
-  // CELL is re-derived here rather than imported to avoid a third copy's worth of import
-  // plumbing for one constant; track/pieces.ts's exported CELL is the canonical value (2.0) this
-  // must stay in sync with (same convention as several other headless files' "keep in sync by
-  // hand" comments).
-  const CELL = 2.0;
   return { x: Math.round(pos.x / CELL), z: Math.round(pos.z / CELL) };
 }
 
