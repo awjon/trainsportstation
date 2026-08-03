@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "prettier --check \"src/**/*.{ts,js}\"",
     "format": "prettier --write \"src/**/*.{ts,js}\"",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify:scenarios": "node scripts/verify-scenarios.mjs"
   },
   "dependencies": {
     "three": "^0.169.0"
