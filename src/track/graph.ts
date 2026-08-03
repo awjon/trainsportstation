@@ -29,6 +29,8 @@ export interface TrackEdge {
   length: number;
   curveClass: CurveClass;
   grade: -1 | 0 | 1;
+  /** true when this edge runs the piece path backwards (toPort → fromPort) */
+  reversed: boolean;
   /** if set, only traversable when the placement's switch is in this state */
   switchState?: 0 | 1;
 }
@@ -88,7 +90,18 @@ export class TrackGraph {
     switchState?: 0 | 1,
   ): void {
     const id = `${placementIndex}:${pathIndex}:${dir}`;
-    this.edges.set(id, { id, from, to, placementIndex, pathIndex, length, curveClass, grade, switchState });
+    this.edges.set(id, {
+      id,
+      from,
+      to,
+      placementIndex,
+      pathIndex,
+      length,
+      curveClass,
+      grade,
+      reversed: dir === 'r',
+      switchState,
+    });
     this.adjacency.get(from)!.push(id);
   }
 
