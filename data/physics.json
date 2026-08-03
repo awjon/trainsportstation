@@ -8,6 +8,7 @@
   "vHardMax": 8.0,
   "vCrawl": 0.3,
   "carriageSpacing": 0.55,
+  "locoLength": 0.6,
 
   "speedBet": {
     "steady": 1.0,

@@ -47,6 +47,8 @@ export interface PhysicsConfig {
   vHardMax: number;
   vCrawl: number;
   carriageSpacing: number;
+  /** length of the locomotive body itself, so a solo engine still occupies track */
+  locoLength: number;
   speedBet: Record<SpeedBet, number>;
   jump: {
     vJump: number;
