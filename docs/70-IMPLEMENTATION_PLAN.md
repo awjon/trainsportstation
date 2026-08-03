@@ -175,32 +175,43 @@ fixture-tested (rockfall window edges, crossing cycle across periods + `ticksUnt
 brokenPiece repaired only by an Engineer at the right station, idempotently).
 The `SimEvent` union now lives in `src/simulation/events.ts` — the log M5 scores from.
 
-### M5 — Scenario runtime (4 tasks)
+### M5 — Scenario runtime (4 tasks) — **DONE**
 
-**M5.1 Schema + validator.**
-A: `src/scenarios/{scenario.schema.json,validate.ts,types.ts}` + tests, fixtures
-`src/scenarios/fixtures/{example-a,example-b}.json` (from 40 §2–3, B completed to full solution).
+**M5.1 Schema + validator.** *(DONE)*
+A (exist): `src/scenarios/{types,validate}.ts` + `validate.test.ts`, scenario `w1-s1.json`
+(docs/40 example A). The validator is **hand-written** rather than schema-library driven —
+adding a JSON-Schema dependency would trip the frozen-dependency stop rule (30 §1); docs/40 §4
+remains the normative spec it implements.
 Reuse: 40 §4–5.
-AC: V1–V5, V7 each have pass+fail tests; both examples validate; unknown-field preservation
-test; friendly error objects (`path`, `rule`, `message`).
+AC met: V1–V5 and V7 each have pass+fail tests; the shipped scenario validates; unknown fields
+are preserved; errors carry `{rule, path, message}`. An unsupported schema major
+short-circuits to the friendly "made with a newer version" message rather than a pile of
+structural errors.
 
-**M5.2 Sim orchestration + replay.**
-A: `src/simulation/{sim,inputs,replay}.ts` + tests.
+**M5.2 Sim orchestration + replay.** *(DONE)*
+A (exist): `src/simulation/{sim,inputs}.ts` + `sim.test.ts`.
 Reuse: 30 §4 `createSim/applyInput/tick/runHeadless`, 40 §6.
-AC: D-1 determinism hash test; replay round-trip (record random inputs → replay → identical
-final hash); `referenceSolution` → replay conversion; 10s wall-clock cap on `runHeadless`.
+AC met: D-1 determinism (identical hashes at ticks 1/60/300/600/899 across two runs, and
+identical stars/Connections/ticks/hash for repeated headless runs); `referenceSolution` →
+replay conversion, ordered by tick; illegal placements refused; no building after dispatch;
+`speedBetAllowed: false` pins the bet. `runHeadless` is bounded by a tick budget
+(`DEFAULT_MAX_TICKS`) rather than a wall clock, so it stays deterministic.
 
-**M5.3 Scoring + personas.**
-A: `src/simulation/scoring.ts`, `data/personas.json`, `src/simulation/personas.ts` + tests.
+**M5.3 Scoring + personas.** *(DONE)*
+A (exist): `src/simulation/{scoring,personas}.ts`, `data/personas.json` + `scoring.test.ts`.
 Reuse: 30 §8 formulas, 20 §3 predicates.
-AC: SC-1 — the six worked examples E1–E6 (20 §3.1) reproduced exactly; each quirk has a
-satisfying + violating synthetic trace; bet-sweep test (10 §13) — stars invariant across bets.
+AC met: SC-1 — E1–E6 reproduced exactly (incl. E4, where Ludicrous voids the elder's quirk and
+*costs* Connections); every quirk has a satisfying and a violating trace; bet sweep confirms
+stars are invariant across bets while Connections are not.
 
-**M5.4 Content CI gate.**
-A: `src/scenarios/content.test.ts`, `scripts/verify-scenarios.mjs`.
+**M5.4 Content CI gate.** *(DONE)*
+A (exist): `src/scenarios/verify.ts` (V6 + fairness), `src/scenarios/content.test.ts`,
+`scripts/verify-scenarios.mjs`, `npm run verify:scenarios`.
 Reuse: 40 §V6, 20 §6 invariants.
-AC: every JSON in `src/scenarios/` is validated + reference-run to 3★ headlessly in CI;
-fairness margins asserted; both fixtures pass. **This gate stays green for every later
+AC met: the gate auto-discovers every JSON in `src/scenarios/` (so a new stage is covered the
+moment it lands), validates it, replays its reference solution to 3★, and asserts the 1.15×
+fairness margin and tray/budget coverage. Negative tests prove the gate actually bites: a
+solution with a gap, and a too-tight time target, both fail. **Stays green for every later
 content task.**
 
 ### M6 — Game shell (4 tasks)

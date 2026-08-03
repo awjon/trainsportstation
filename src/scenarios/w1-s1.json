@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0",
+  "id": "w1-s1",
+  "meta": {
+    "name": "First Light",
+    "author": "guild",
+    "world": 1,
+    "biome": "meadow",
+    "description": "Bring the morning commuters home to Bellbrook."
+  },
+  "grid": { "width": 8, "height": 6 },
+  "terrain": [],
+  "countdownTicks": 900,
+  "speedBetAllowed": false,
+  "trains": [
+    { "id": "t1", "model": "train-locomotive-a", "carriageCount": 1, "spawnStationId": "depot" }
+  ],
+  "stations": [
+    { "id": "depot", "cell": { "x": 1, "z": 3 }, "orientation": "EW", "name": "Guild Depot" },
+    { "id": "bellbrook", "cell": { "x": 6, "z": 3 }, "orientation": "EW", "name": "Bellbrook" }
+  ],
+  "passengers": [{ "id": "p1", "persona": "commuter", "from": "depot", "to": "bellbrook" }],
+  "pieceTray": [{ "piece": "straight", "count": 6 }],
+  "stars": { "pieceBudget": 4, "timeTargetTicks": 1500 },
+  "payoff": { "type": "lightsOn", "focusStationId": "bellbrook" },
+  "hints": [
+    {
+      "afterFailures": 2,
+      "placements": [
+        { "piece": "straight", "cell": { "x": 2, "z": 3 }, "rotation": 1 },
+        { "piece": "straight", "cell": { "x": 3, "z": 3 }, "rotation": 1 },
+        { "piece": "straight", "cell": { "x": 4, "z": 3 }, "rotation": 1 },
+        { "piece": "straight", "cell": { "x": 5, "z": 3 }, "rotation": 1 }
+      ]
+    }
+  ],
+  "referenceSolution": {
+    "seed": 1,
+    "speedBet": "steady",
+    "dispatchTick": 300,
+    "placements": [
+      { "piece": "straight", "cell": { "x": 2, "z": 3 }, "rotation": 1 },
+      { "piece": "straight", "cell": { "x": 3, "z": 3 }, "rotation": 1 },
+      { "piece": "straight", "cell": { "x": 4, "z": 3 }, "rotation": 1 },
+      { "piece": "straight", "cell": { "x": 5, "z": 3 }, "rotation": 1 }
+    ]
+  }
+}
