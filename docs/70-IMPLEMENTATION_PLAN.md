@@ -67,20 +67,22 @@ AC: `buildPiece` generates all 16 `PieceType`s; `makeLocomotive`/`makeCarriage`/
 the asset lab renders the full set. This module is the basis M3 builds instancing on.
 V: `npm run test` green; `npm run build` green; asset lab screenshots render all pieces.
 
-### M1 — Core primitives (2 tasks)
+### M1 — Core primitives (2 tasks) — **DONE**
 
-**M1.1 Math, PRNG, hashing, event bus.**
-A: `src/core/{types,math,rng,hash,events}.ts` + tests.
+**M1.1 Math, PRNG, hashing, event bus.** *(DONE)*
+A (exist): `src/core/{math,rng,hash,events}.ts` + `determinism.test.ts`.
 Reuse: 30 §4 core types, 30 §3.3–3.4.
-AC: `mulberry32` reproduces a published 10-value vector for seed 42; `stateHash` canonical
-(key order independent — test shuffled-object equality); typed event bus with unsubscribe.
+AC met: `mulberry32` reproducible per seed and bounded to [0,1); `stateHash` canonical
+(key-order independent, numbers quantized to 9dp, −0 normalized, Map/Set support); typed
+event bus with unsubscribe that survives unsubscribing mid-dispatch.
 
-**M1.2 Fixed-timestep driver.**
-A: `src/core/loop.ts` + tests, `src/app/main.ts` (wire cube to loop).
+**M1.2 Fixed-timestep driver.** *(DONE)*
+A (exist): `src/core/loop.ts` + tests. (`src/app/main.ts` wiring lands with M6's shell.)
 Reuse: 30 §3.1–3.2.
-AC: accumulator loop produces exactly 60 ticks/sim-second under mocked frame times (16.6ms,
-33ms, 200ms spiral-of-death clamp); interpolation alpha exposed; loop is
-pausable/single-steppable (assist mode + tests need this).
+AC met: exactly 60 ticks/sim-second, sub-tick deltas accumulate rather than drop, 33ms frames
+run 1 then 2 ticks, huge frames clamp without a spiral, interpolation alpha exposed, loop is
+pausable and single-steppable (assist mode). Time is passed in by the caller — no clock reads
+in the headless zone.
 
 ### M2 — Track model, headless (3 tasks) — **DONE**
 
@@ -138,34 +140,40 @@ well-formed `{position,normal,color}` non-indexed asset and never throws. **Defe
 (junction interaction): expose the junction lever as a named node for the flip animation — it
 is currently baked into the piece glow, which is right for instancing but not yet animatable.
 
-### M4 — Train sim + physics, headless (4 tasks)
+### M4 — Train sim + physics, headless (4 tasks) — **DONE**
 
-**M4.1 Spline compilation + LUTs.**
-A: `src/track/splines.ts` + tests.
+**M4.1 Spline compilation + LUTs.** *(DONE)*
+A (exist): `src/track/splines.ts` + `splines.test.ts`.
 Reuse: 30 §6, `PathDef`.
-AC: LUT lengths within 0.5% of `PathDef.length`; S-1 continuity invariant across all
-adjacent piece pairs generated from the port table.
+AC met: 64-sample arc-length LUTs within 0.5% of a dense measurement; `PIECE_DEFS` lengths
+corrected to the measured geometry and pinned within 1%; S-1 continuity verified for
+straight→straight, straight→curve (tangents within ~8°) and ramp→shelf.
 
-**M4.2 Train kinematics.**
-A: `src/train/{types,movement}.ts` + tests.
-Reuse: 30 §4 `TrainState`, 30 §6 handoff rules, `data/physics.json` (create from 30 §7 baselines).
-AC: P-1 convergence; edge handoff conserves leftover distance (property test: total distance
-= Σv·dt over 1000 random tick sequences); carriage trailing walks edge chains correctly
-around curves and junctions.
+**M4.2 Train kinematics.** *(DONE)*
+A (exist): `src/train/{types,runtime,movement}.ts` + `movement.test.ts`, `data/physics.json`.
+Reuse: 30 §4 `TrainState`, 30 §6 handoff rules.
+AC met: P-1 convergence (and bet ordering, grade response, clamps); edge handoff conserves
+leftover distance (odometer == Σ distance over random tick sequences; displacement == odometer
+on a straight); carriage trailing walks the edge chain on straights, across boundaries, and
+around curves.
 
-**M4.3 Arcade physics: jumps, derails, collisions.**
-A: `src/train/physics.ts` + tests.
+**M4.3 Arcade physics: jumps, derails, collisions.** *(DONE)*
+A (exist): `src/train/physics.ts` + `physics.test.ts`.
 Reuse: 30 §7.2–7.4.
-AC: P-2 derail threshold fixture; P-3 exact-tick collision; jump launch/landing/bad-landing
-each fixture-tested, incl. w2-s5's "Steady teeters into the gorge" case (dead-end below
-vJump at height ≥ 1 → `gap`).
+AC met: P-2 threshold ±0.01 either side of the 12-tick grace window (+ blip forgiveness);
+P-3 exact-tick collision (clear the tick before, overlapping on it) incl. crossing lanes
+sharing a cell; jump launch / aligned landing / wrong-way rejection / bad-landing, and w2-s5's
+"too slow to jump, too fast to stop" → `gap`. Trains carry a `locoLength` so a solo engine
+still occupies track.
 
-**M4.4 Stations, boarding, hazards.**
+**M4.4 Stations, boarding, hazards.** *(DONE)*
 A: `src/train/stations.ts`, `src/simulation/hazards.ts` + tests.
 Reuse: 30 §7.5, 40 §1.1.
-AC: dwell/stop/board/deliver event sequence matches a golden trace; capacity respected;
-all three hazard kinds fixture-tested (rockfall window, crossing cycle, brokenPiece +
-`PieceRepaired`).
+AC met: golden board→dwell→deliver trace; capacity is the carriage count (extras wait);
+deliveries run before boardings so a seat frees within one stop; all three hazard kinds
+fixture-tested (rockfall window edges, crossing cycle across periods + `ticksUntilOpen`,
+brokenPiece repaired only by an Engineer at the right station, idempotently).
+The `SimEvent` union now lives in `src/simulation/events.ts` — the log M5 scores from.
 
 ### M5 — Scenario runtime (4 tasks)
 

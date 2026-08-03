@@ -82,16 +82,20 @@ export interface PieceDef {
 const c = (x: number, z: number): CellCoord => ({ x, z });
 const p = (cell: CellCoord, edge: Direction, height: HeightLevel = 0): Port => ({ cell, edge, height });
 
-// Approximate path lengths in cell units.
+// Path lengths in cell units, measured from the actual curves in splines.ts (a test asserts
+// these stay within 1% of the geometry, so the sim's distances match what a player sees).
+// One elevation level is half a cell in ground-plane units, hence the ramp's hypotenuse.
 const L_STRAIGHT = 1.0;
-const L_RAMP = Math.SQRT2; // rises one level over one cell
-const L_CURVE_SMALL = (Math.PI / 2) * 0.5; // quarter circle, r = 0.5 cell
-const L_CURVE_LARGE = (Math.PI / 2) * 1.5; // quarter circle, r = 1.5 cell
-const L_HILL = 2.2;
-const L_BUMP = 1.1;
-const L_SBEND = 2.3;
-const L_SKEW = 1.6;
-const L_BRIDGE = 3.4;
+const L_RAMP = Math.hypot(1, 0.5); // 1.1180 — rises one level over one cell
+const L_CURVE_SMALL = (Math.PI / 2) * 0.5; // 0.7854 — quarter circle, r = 0.5 cell
+const L_CURVE_LARGE = (Math.PI / 2) * 1.5; // 2.3562 — quarter circle, r = 1.5 cell
+const L_CURVE_SMALL_RAMP = 0.931;
+const L_CURVE_LARGE_RAMP = 2.4086;
+const L_HILL = 2.1328;
+const L_BUMP = 1.094;
+const L_SBEND = 2.6788;
+const L_SKEW = 1.6672;
+const L_BRIDGE = 3.2524;
 
 export const PIECE_DEFS: Record<PieceType, PieceDef> = {
   straight: {
@@ -154,14 +158,14 @@ export const PIECE_DEFS: Record<PieceType, PieceDef> = {
     type: 'curve-small-ramp',
     footprint: [c(0, 0)],
     ports: [p(c(0, 0), 'N', 0), p(c(0, 0), 'E', 1)],
-    paths: [{ fromPort: 0, toPort: 1, curveClass: 'tight', grade: 1, length: L_CURVE_SMALL * 1.2 }],
+    paths: [{ fromPort: 0, toPort: 1, curveClass: 'tight', grade: 1, length: L_CURVE_SMALL_RAMP }],
     tags: [],
   },
   'curve-large-ramp': {
     type: 'curve-large-ramp',
     footprint: [c(0, 0), c(1, 0), c(0, 1), c(1, 1)],
     ports: [p(c(0, 0), 'N', 0), p(c(1, 1), 'E', 1)],
-    paths: [{ fromPort: 0, toPort: 1, curveClass: 'gentle', grade: 1, length: L_CURVE_LARGE * 1.1 }],
+    paths: [{ fromPort: 0, toPort: 1, curveClass: 'gentle', grade: 1, length: L_CURVE_LARGE_RAMP }],
     tags: [],
   },
   hill: {

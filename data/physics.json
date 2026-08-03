@@ -1,0 +1,41 @@
+{
+  "$comment": "Arcade physics constants (docs/30 §7). All distances in CELL UNITS, times in seconds. Tuning happens here, never in code — this file is also the fixture the physics tests read.",
+
+  "vBase": 3.0,
+  "aThrottle": 2.0,
+  "gSlope": 1.2,
+  "cDrag": 0.08,
+  "vHardMax": 8.0,
+  "vCrawl": 0.3,
+  "carriageSpacing": 0.55,
+  "locoLength": 0.6,
+
+  "speedBet": {
+    "steady": 1.0,
+    "swift": 1.4,
+    "ludicrous": 1.9
+  },
+
+  "jump": {
+    "vJump": 3.5,
+    "gAir": 9.0,
+    "landingRadius": 0.4,
+    "landingAngleDeg": 25,
+    "landingHeightTolerance": 0.3,
+    "landingSpeedRetained": 0.85
+  },
+
+  "derail": {
+    "graceTicks": 12,
+    "maxSpeed": {
+      "straight": null,
+      "gentle": 4.5,
+      "tight": 3.2
+    }
+  },
+
+  "station": {
+    "dwellTicks": 90,
+    "stopTolerance": 0.05
+  }
+}
