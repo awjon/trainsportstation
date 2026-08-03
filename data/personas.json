@@ -1,0 +1,17 @@
+{
+  "$comment": "Persona roster (docs/20 §3). baseValue is the Connections a delivery is worth; quirkBonus multiplies it when the persona's quirk is satisfied. Quirk predicates are computed over the SimEvent log in src/simulation/personas.ts.",
+
+  "quirkBonus": 1.5,
+
+  "personas": {
+    "commuter": { "name": "Commuter", "icon": "briefcase", "carriage": "container", "baseValue": 10 },
+    "kid": { "name": "School Kid", "icon": "kite", "carriage": "container", "baseValue": 8 },
+    "elder": { "name": "Elder", "icon": "yarn", "carriage": "container", "baseValue": 12 },
+    "musician": { "name": "Musician", "icon": "note", "carriage": "flatbed", "baseValue": 10 },
+    "doctor": { "name": "Doctor", "icon": "cross", "carriage": "tank", "baseValue": 15 },
+    "engineer": { "name": "Engineer", "icon": "wrench", "carriage": "flatbed", "baseValue": 12 }
+  },
+
+  "kidArrivalWindowTicks": 600,
+  "musicianScenicRatio": 1.3
+}
