@@ -12,7 +12,8 @@
     "lint": "prettier --check \"src/**/*.{ts,js}\"",
     "format": "prettier --write \"src/**/*.{ts,js}\"",
     "test": "vitest run",
-    "verify:scenarios": "node scripts/verify-scenarios.mjs"
+    "verify:scenarios": "node scripts/verify-scenarios.mjs",
+    "playthrough": "node scripts/playthrough.mjs"
   },
   "dependencies": {
     "three": "^0.169.0"

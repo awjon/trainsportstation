@@ -113,7 +113,10 @@ export const GAGS: Record<CrashCause, Gag[]> = {
  * A gag for a cause. `pick` defaults to `Math.random` — deliberately unseeded, because this is
  * presentation only. Pass a chooser in tests (or to make a gag reproducible in a capture).
  */
-export function gagFor(cause: CrashCause, pick: (n: number) => number = (n) => Math.floor(Math.random() * n)): Gag {
+export function gagFor(
+  cause: CrashCause,
+  pick: (n: number) => number = (n) => Math.floor(Math.random() * n),
+): Gag {
   const options = GAGS[cause];
   const i = Math.min(Math.max(pick(options.length), 0), options.length - 1);
   return options[i];

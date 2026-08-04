@@ -39,9 +39,7 @@ export class ResolvePanel {
       el('h1', { text: 'Connected!' }),
       el('h2', { text: stationName }),
       el('p', { text: PAYOFF_COPY[payoff] ?? PAYOFF_COPY.lightsOn }),
-      el('div', { class: 'card-actions' }, [
-        button('Continue ▸', () => this.cb.onContinue(), 'btn btn-big'),
-      ]),
+      el('div', { class: 'card-actions' }, [button('Continue ▸', () => this.cb.onContinue(), 'btn btn-big')]),
     );
   }
 

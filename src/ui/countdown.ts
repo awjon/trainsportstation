@@ -30,8 +30,7 @@ export function countdownModel(ticksLeft: number, totalTicks: number): Countdown
   const left = Math.min(Math.max(ticksLeft, 0), total);
   const seconds = left * TICK_DT;
   const fraction = left / total;
-  const urgency: Urgency =
-    seconds <= URGENT_SECONDS ? 'urgent' : fraction <= WARN_FRACTION ? 'warn' : 'calm';
+  const urgency: Urgency = seconds <= URGENT_SECONDS ? 'urgent' : fraction <= WARN_FRACTION ? 'warn' : 'calm';
   return {
     ticksLeft: left,
     secondsLeft: seconds,

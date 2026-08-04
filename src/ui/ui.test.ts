@@ -79,7 +79,13 @@ describe('trayModel', () => {
   });
 
   it('nextUsableSlot skips exhausted slots and wraps', () => {
-    const slots = trayModel(tray, [{ piece: 'straight' }, { piece: 'straight' }, { piece: 'straight' }, { piece: 'straight' }, { piece: 'straight' }]);
+    const slots = trayModel(tray, [
+      { piece: 'straight' },
+      { piece: 'straight' },
+      { piece: 'straight' },
+      { piece: 'straight' },
+      { piece: 'straight' },
+    ]);
     expect(nextUsableSlot(slots, 0)).toBe(1);
     expect(nextUsableSlot(slots, 1)).toBe(1);
   });
@@ -128,13 +134,25 @@ describe('starGoals', () => {
   });
 
   it('judges the budget live during the build phase', () => {
-    const live = { piecesPlaced: 4, delivered: 0, requiredTotal: 1, crashed: false, lastRequiredDeliveryTick: null };
+    const live = {
+      piecesPlaced: 4,
+      delivered: 0,
+      requiredTotal: 1,
+      crashed: false,
+      lastRequiredDeliveryTick: null,
+    };
     expect(starGoals(targets, live)[1].met).toBe(true);
     expect(starGoals(targets, { ...live, piecesPlaced: 5 })[1].met).toBe(false);
   });
 
   it('a crash forfeits Complete even with everyone delivered', () => {
-    const live = { piecesPlaced: 2, delivered: 1, requiredTotal: 1, crashed: true, lastRequiredDeliveryTick: 500 };
+    const live = {
+      piecesPlaced: 2,
+      delivered: 1,
+      requiredTotal: 1,
+      crashed: true,
+      lastRequiredDeliveryTick: 500,
+    };
     expect(starGoals(targets, live)[0].met).toBe(false);
   });
 

@@ -136,9 +136,9 @@ factories per biome), `src/render/meshgen/generators.test.ts`, lab `?view=props`
 Reuse: 60 §4–5, existing generators.
 AC: per-biome prop variants added (60 §5, 20 §1 dressing); regression test that every
 generator (16 pieces + rolling stock + structures + props + biome factories) builds a
-well-formed `{position,normal,color}` non-indexed asset and never throws. **Deferred to M6.2**
-(junction interaction): expose the junction lever as a named node for the flip animation — it
-is currently baked into the piece glow, which is right for instancing but not yet animatable.
+well-formed `{position,normal,color}` non-indexed asset and never throws. *(The junction-lever
+deferral is now **settled in M6.2**: the static post + signal lamp stay baked into the instanced
+piece, and the swinging handle is a separate named node, `render/junctions.ts`.)*
 
 ### M4 — Train sim + physics, headless (4 tasks) — **DONE**
 
@@ -214,30 +214,52 @@ fairness margin and tray/budget coverage. Negative tests prove the gate actually
 solution with a gap, and a too-tight time target, both fail. **Stays green for every later
 content task.**
 
-### M6 — Game shell (4 tasks)
+### M6 — Game shell (4 tasks) — **DONE**
 
-**M6.1 Screen state machine + Preview/Countdown UI.**
-A: `src/app/screens.ts`, `src/ui/{hud,tray,countdown}.ts`, styles.
-Reuse: 10 §3 state table (normative transitions), 30 §10, 30 §12.
-AC: state machine is data + tested (every 10 §3 transition, nothing else reachable);
-tray placement drives the shared `PlacementSystem`; radial countdown; dispatch-early;
-ghost preview + rotate on desktop and touch.
+**M6.1 Screen state machine + Preview/Countdown UI.** *(DONE)*
+A: `src/app/screens.ts` + `screens.test.ts`, `src/ui/{dom,hud,tray,countdown,preview}.ts`,
+`src/ui/styles.css`, `src/ui/ui.test.ts`.
+The core loop is a transition **table**, not a switch: `TRANSITIONS` is the complete list of
+legal moves and the test transcribes docs/10 §3 by hand and asserts the two sets are equal, so
+an undocumented edge fails as loudly as a missing one. One conditional edge (`speedBetAllowed`)
+covers the tutorial skip. Every screen's view model — countdown ring, tray stock, manifest
+chips, live star goals, preview card — is a pure function tested headlessly; the DOM classes
+only paint what those return. Ghost preview turns red on an illegal cell (the UI asks
+`validatePlacement`, so it can never disagree with the sim), rotate is R/scroll or an on-screen
+button, and Dispatch Early is live from the first frame.
 
-**M6.2 SpeedBet, Watch, junction taps.**
-A: `src/ui/{speedbet,watch}.ts`, `src/app/screens.ts`.
-Reuse: 10 §8, 30 §5 switch input, 40 §6 input events.
-AC: bet screen (skipped when `speedBetAllowed:false`); Watch records all inputs as replay
-events; junction tap flips lever animation + sim switch.
+**M6.2 SpeedBet, Watch, junction taps.** *(DONE)*
+A: `src/ui/{speedbet,watch}.ts`, `src/app/session.ts` + `session.test.ts`,
+`src/render/junctions.ts` + `junctions.test.ts`.
+`StageSession` is the play loop: **every** player action becomes an `InputEvent` first and is
+appended to a `Replay` before it reaches the sim, so a played run *is* its own replay. The test
+plays the author's solution through the player-facing API, then re-runs the recording through
+`runHeadless` and gets the same stars, Connections, delivery tick and tick count as the CI
+content gate — which is what makes ghost replays, the editor's playtest and CI one code path.
+Bet odds are read from `data/physics.json` and `BET_CONNECTION_MULTIPLIER`, never retyped.
+Junction levers are named nodes (`junction-lever-<n>`) that ease between two angles.
 
-**M6.3 Resolve + Results.**
-A: `src/ui/results.ts`, `src/effects/crashes.ts`.
-Reuse: 30 §7.6 gag table, 10 §7, 20 §8 button copy.
-AC: crash → gag by cause (render-only randomness) → "Once more, with feeling"; success →
-results tally animation with itemized quirk bonuses; retry restarts instantly with same
-scenario, zero meta loss.
+**M6.3 Resolve + Results.** *(DONE)*
+A: `src/ui/{resolve,results}.ts` + `results.test.ts`, `src/effects/crashes.ts`.
+`resultsModel` re-derives its rows from the same pure functions that produced the score, so the
+receipt can never disagree with the total — asserted against a real run of `w1-s1`. Gags are a
+cause → slapstick table; the variant picker takes an injectable chooser and defaults to
+unseeded `Math.random`, which is safe precisely because presentation cannot reach sim state.
+Retry copy follows docs/20 §8 ("Once more, with feeling" / "Again!").
 
-**M6.4 Playable vertical slice.**
-A: glue only (`src/app/*`), `src/scenarios/w1-s1.json` (authored per 20 §4 brief).
+**Sim change made here.** A run where the train simply coasts to a halt — no crash, no
+delivery — previously never resolved, leaving the player watching forever with no input that
+could end it. `isResolved` now also fires after `STALL_TICKS` (120) with every train stopped,
+and the case is covered by a session test that would hang without it.
+
+**M6.4 Playable vertical slice.** *(DONE — awaiting the G5 human checkpoint)*
+A: `src/app/main.ts`, `src/render/board.ts`, `index.html` (now the game), `lab.html` (the asset
+lab moved here), `vite.config.ts` (two pages), `scripts/playthrough.mjs`.
+`BoardView` is a projection of `SimState`, never a second source of truth: pieces are placed
+from `sim.placements` through `TrackInstances`, and carriages are positioned by asking the sim's
+own `TrackRuntime`. Verified end to end in a real browser by `npm run playthrough`, which drives
+the actual UI — start, lay four straights by clicking cells, dispatch early, watch, payoff — and
+lands on **3★ / 13 Connections**, matching worked example E1 and the CI content gate.
 Reuse: everything above.
 AC: w1-s1 playable start-to-finish in browser: preview → build under countdown → dispatch →
 deliver → placeholder payoff → results with correct stars/Connections vs. E1/E2 fixtures.

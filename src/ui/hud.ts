@@ -75,7 +75,13 @@ export interface StarGoal {
  */
 export function starGoals(
   targets: StarTargets,
-  live?: { piecesPlaced: number; delivered: number; requiredTotal: number; crashed: boolean; lastRequiredDeliveryTick: number | null },
+  live?: {
+    piecesPlaced: number;
+    delivered: number;
+    requiredTotal: number;
+    crashed: boolean;
+    lastRequiredDeliveryTick: number | null;
+  },
 ): StarGoal[] {
   const seconds = (ticks: number) => `${(ticks / 60).toFixed(0)}s`;
   return [
@@ -90,9 +96,7 @@ export function starGoals(
     {
       id: 'efficient',
       label: 'Efficient',
-      detail: live
-        ? `${live.piecesPlaced}/${targets.pieceBudget} pieces`
-        : `≤ ${targets.pieceBudget} pieces`,
+      detail: live ? `${live.piecesPlaced}/${targets.pieceBudget} pieces` : `≤ ${targets.pieceBudget} pieces`,
       met: !!live && live.piecesPlaced <= targets.pieceBudget,
     },
     {

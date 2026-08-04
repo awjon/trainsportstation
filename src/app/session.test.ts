@@ -140,3 +140,25 @@ describe('StageSession', () => {
     expect(s.tick).toBe(5);
   });
 });
+
+describe('a run that simply stops', () => {
+  it('resolves as a failure instead of hanging forever', () => {
+    // lay a line that stops short of the destination: the train rolls to the gap, coasts to a
+    // halt, and is neither crashed nor delivered. Without the stall rule this run never ends.
+    const s = new StageSession(scenario(), 1);
+    const ref = s.scenario.referenceSolution;
+    for (const p of ref.placements.slice(0, ref.placements.length - 1)) {
+      s.place(p.piece, p.cell, p.rotation);
+    }
+    s.dispatch();
+
+    let guard = 0;
+    while (!s.finished && guard++ < 5_000) s.step();
+
+    const outcome = s.finish();
+    expect(s.finished).not.toBeNull();
+    expect(guard).toBeLessThan(5_000); // it actually terminated
+    expect(outcome.result.outcome).toBe('failed');
+    expect(outcome.stars).toBe(0);
+  });
+});

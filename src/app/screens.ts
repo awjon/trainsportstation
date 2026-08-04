@@ -11,15 +11,7 @@
 import { EventBus } from '../core/events';
 
 export type ScreenId =
-  | 'title'
-  | 'worldMap'
-  | 'preview'
-  | 'countdown'
-  | 'speedBet'
-  | 'dispatch'
-  | 'watch'
-  | 'resolve'
-  | 'results';
+  'title' | 'worldMap' | 'preview' | 'countdown' | 'speedBet' | 'dispatch' | 'watch' | 'resolve' | 'results';
 
 export const SCREENS: ScreenId[] = [
   'title',

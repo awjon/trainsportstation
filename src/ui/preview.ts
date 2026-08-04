@@ -65,9 +65,7 @@ export class PreviewPanel {
         ),
       ),
       el('p', { text: `You get ${m.buildSeconds} seconds to build. Dispatch early if you dare.` }),
-      el('div', { class: 'card-actions' }, [
-        button('Start building ▸', () => this.onStart(), 'btn btn-big'),
-      ]),
+      el('div', { class: 'card-actions' }, [button('Start building ▸', () => this.onStart(), 'btn btn-big')]),
     );
   }
 }

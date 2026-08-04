@@ -24,10 +24,7 @@ export interface TraySlot {
  * what the player has already laid. First-appearance order is kept so the tray is stable and
  * the number keys always mean the same thing.
  */
-export function trayModel(
-  tray: readonly TrayEntry[],
-  placed: readonly { piece: PieceType }[],
-): TraySlot[] {
+export function trayModel(tray: readonly TrayEntry[], placed: readonly { piece: PieceType }[]): TraySlot[] {
   const totals = new Map<PieceType, number>();
   for (const entry of tray) totals.set(entry.piece, (totals.get(entry.piece) ?? 0) + entry.count);
 
@@ -103,9 +100,7 @@ export class TrayHud {
     this.list = el('div', { class: 'tray-slots' });
     this.root = el('div', { class: 'tray' }, [
       this.list,
-      el('div', { class: 'tray-tools' }, [
-        button('⟳ Rotate', () => this.cb.onRotate(1), 'btn btn-small'),
-      ]),
+      el('div', { class: 'tray-tools' }, [button('⟳ Rotate', () => this.cb.onRotate(1), 'btn btn-small')]),
     ]);
   }
 

@@ -165,7 +165,9 @@ export class ResultsPanel {
   }
 
   show(m: ResultsModel): void {
+    // the grand total is the hero number at the bottom, so it is not also a tally row
     const total = el('div', { class: 'connections-total', text: '0' });
+    const rows = m.rows.filter((r) => r.kind !== 'total');
 
     this.card.replaceChildren(
       el(
@@ -177,14 +179,17 @@ export class ResultsPanel {
       el(
         'div',
         { class: 'tally' },
-        m.rows.map((row) =>
+        rows.map((row) =>
           el('div', { class: `tally-row is-${row.kind}` }, [
             el('span', { class: 'tally-label', text: row.label }),
             el('span', { class: 'tally-value', text: row.value }),
           ]),
         ),
       ),
-      total,
+      el('div', { class: 'connections' }, [
+        total,
+        el('span', { class: 'connections-label', text: 'Connections' }),
+      ]),
       el('div', { class: 'card-actions' }, [
         button(m.retryLabel, () => this.cb.onRetry(), 'btn btn-big btn-ghost'),
         button('World map ▸', () => this.cb.onNext(), 'btn btn-big'),
