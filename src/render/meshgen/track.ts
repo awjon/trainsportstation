@@ -201,12 +201,43 @@ function moundTunnel(): THREE.BufferGeometry[] {
   return parts;
 }
 
-/** Switch lever: a steel post (body) topped by a glowing signal flag (bloom layer). */
+/**
+ * The static half of a junction's switch stand: a steel post with a lit signal lamp. This part
+ * is baked into the instanced piece, so a field of junctions is still one draw call.
+ *
+ * The *moving* half — the handle that swings when the player taps the junction — is built
+ * separately by `makeJunctionLever()` so it can be an addressable, animatable node
+ * (docs/70 M3.3, deferred to M6.2).
+ */
 function leverPost(): { body: THREE.BufferGeometry[]; glow: THREE.BufferGeometry[] } {
   return {
-    body: [box(0.14, 0.5, 0.14, PALETTE.steel, [HALF - 0.35, 0.25, 0.0])],
-    glow: [box(0.12, 0.12, 0.44, PALETTE.signal, [HALF - 0.35, 0.46, 0.18])],
+    body: [box(0.14, 0.5, 0.14, PALETTE.steel, [LEVER_ANCHOR[0], 0.25, LEVER_ANCHOR[2]])],
+    glow: [box(0.12, 0.12, 0.16, PALETTE.signal, [LEVER_ANCHOR[0], LEVER_ANCHOR[1] + 0.06, LEVER_ANCHOR[2]])],
   };
+}
+
+/**
+ * Where the junction's lever pivots, in piece-local coordinates. The animated handle is parented
+ * at this point so rotating the node about Z swings the handle without moving the post.
+ */
+export const LEVER_ANCHOR: readonly [number, number, number] = [HALF - 0.35, 0.5, 0];
+
+/** Swing angles (radians about Z) for switch state 0 and 1 — the visible state of a junction. */
+export const LEVER_ANGLES: readonly [number, number] = [-0.55, 0.55];
+
+/**
+ * The swinging handle of a junction's switch stand, built about its own pivot (origin = the
+ * anchor above). Kept out of the instanced piece precisely because it must be animatable per
+ * placement; junctions are rare enough that a mesh each is free.
+ */
+export function makeJunctionLever(): Asset {
+  return buildAsset(
+    [
+      box(0.09, 0.42, 0.09, PALETTE.steel, [0, 0.21, 0]), // the arm
+      box(0.2, 0.1, 0.16, PALETTE.brass, [0, 0.44, 0]), // the grip
+    ],
+    [box(0.13, 0.13, 0.13, PALETTE.signal, [0, 0.5, 0])], // tip light, so the state reads at a glance
+  );
 }
 
 function crossingDeck(): THREE.BufferGeometry[] {

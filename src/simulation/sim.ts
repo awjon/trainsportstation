@@ -387,7 +387,12 @@ export function isResolved(state: SimState): boolean {
   return state.dispatched && state.trains.length > 0 && state.trains.every((t) => t.crashed !== null);
 }
 
-function buildResult(state: SimState): SimResult {
+/**
+ * The scoreable summary of a run so far. Exported because the game shell scores a live run the
+ * same way the headless runner scores a replay — one function, so a played run and its replay
+ * can never be scored differently.
+ */
+export function resultOf(state: SimState): SimResult {
   const required = state.passengers.filter((p) => p.required !== false).map((p) => p.id);
   const deliveries = state.events.filter((e) => e.type === 'Delivered') as Array<
     Extract<SimEvent, { type: 'Delivered' }>
@@ -448,6 +453,8 @@ export function quirkContextFor(state: SimState, result: SimResult): QuirkContex
 
 export interface HeadlessOutcome {
   result: SimResult;
+  /** the quirk inputs the score was computed from — the results screen itemizes from these */
+  quirks: QuirkContext;
   stars: 0 | 1 | 2 | 3;
   connections: number;
   ticks: number;
@@ -467,11 +474,12 @@ export function runHeadless(
     tick(state);
   }
 
-  const result = buildResult(state);
+  const result = resultOf(state);
   const targets: StarTargets = state.scenario.stars;
   const ctx = quirkContextFor(state, result);
   return {
     result,
+    quirks: ctx,
     stars: computeStars(result, targets),
     connections: computeConnections(result, ctx),
     ticks: state.tick,
