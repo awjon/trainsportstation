@@ -2,39 +2,32 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Trainsportstation — Asset Lab</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Trainsportstation</title>
     <style>
       html,
       body {
         margin: 0;
         padding: 0;
         overflow: hidden;
-        background: #acd6e6;
-        font-family: system-ui, sans-serif;
+        background: #bfe3f0;
+        overscroll-behavior: none;
+        touch-action: none;
       }
       #app {
         width: 100vw;
         height: 100vh;
         display: block;
       }
-      #hud {
-        position: fixed;
-        top: 12px;
-        left: 12px;
-        color: #24323a;
-        background: rgba(255, 255, 255, 0.72);
-        padding: 8px 12px;
-        border-radius: 8px;
-        font-size: 13px;
-        line-height: 1.5;
-        pointer-events: none;
-      }
     </style>
   </head>
   <body>
     <canvas id="app"></canvas>
-    <div id="hud">Trainsportstation — procedural asset lab</div>
-    <script type="module" src="/src/lab/main.ts"></script>
+    <!-- the DOM overlay UI mounts here (docs/30 §10) -->
+    <div id="ui"></div>
+    <script type="module" src="/src/app/main.ts"></script>
   </body>
 </html>

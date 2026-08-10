@@ -30,7 +30,7 @@ import {
   stepAirborne,
   type LandingSite,
 } from '../train/physics';
-import { makeTrain, type SpeedBet, type TrainState } from '../train/types';
+import { makeTrain, PHYSICS, type SpeedBet, type TrainState } from '../train/types';
 import {
   initStations,
   stepStation,
@@ -73,6 +73,8 @@ export interface SimState {
   events: SimEvent[];
   playerPlacements: number;
   travelled: Map<string, number>;
+  /** consecutive ticks with every train standing still — see STALL_TICKS */
+  stalledTicks: number;
   finished: boolean;
 }
 
@@ -122,6 +124,7 @@ export function createSim(scenario: Scenario, seed: number): SimState {
     events: [],
     playerPlacements: 0,
     travelled: new Map(),
+    stalledTicks: 0,
     finished: false,
   };
 
@@ -374,20 +377,42 @@ export function tick(state: SimState): SimEvent[] {
     }
   }
 
+  state.stalledTicks = state.dispatched && everyoneStopped(state) ? state.stalledTicks + 1 : 0;
   state.tick++;
   if (isResolved(state)) state.finished = true;
   return produced;
 }
 
-/** Complete (everyone required delivered) or hopeless (every train wrecked). */
+/**
+ * Ticks of everything-standing-still before a run is called off. A train that rolls gently to a
+ * halt at a gap is not a crash and not a delivery — without this the run would simply never end,
+ * which is the one outcome a player can do nothing about.
+ */
+export const STALL_TICKS = 120;
+
+/** Is every train parked — not crashed, not dwelling at a stop, not in the air, not moving? */
+function everyoneStopped(state: SimState): boolean {
+  return state.trains.every(
+    (t) => t.crashed !== null || (!t.airborne && t.dwellTicks === 0 && Math.abs(t.v) < PHYSICS.vCrawl),
+  );
+}
+
+/** Complete (everyone required delivered), hopeless (every train wrecked), or stalled. */
 export function isResolved(state: SimState): boolean {
   const required = state.passengers.filter((p) => p.required !== false);
   const allDelivered = required.every((p) => state.stationState.delivered.has(p.id));
   if (allDelivered) return true;
-  return state.dispatched && state.trains.length > 0 && state.trains.every((t) => t.crashed !== null);
+  if (!state.dispatched || state.trains.length === 0) return false;
+  if (state.trains.every((t) => t.crashed !== null)) return true;
+  return state.stalledTicks >= STALL_TICKS;
 }
 
-function buildResult(state: SimState): SimResult {
+/**
+ * The scoreable summary of a run so far. Exported because the game shell scores a live run the
+ * same way the headless runner scores a replay — one function, so a played run and its replay
+ * can never be scored differently.
+ */
+export function resultOf(state: SimState): SimResult {
   const required = state.passengers.filter((p) => p.required !== false).map((p) => p.id);
   const deliveries = state.events.filter((e) => e.type === 'Delivered') as Array<
     Extract<SimEvent, { type: 'Delivered' }>
@@ -448,6 +473,8 @@ export function quirkContextFor(state: SimState, result: SimResult): QuirkContex
 
 export interface HeadlessOutcome {
   result: SimResult;
+  /** the quirk inputs the score was computed from — the results screen itemizes from these */
+  quirks: QuirkContext;
   stars: 0 | 1 | 2 | 3;
   connections: number;
   ticks: number;
@@ -467,11 +494,12 @@ export function runHeadless(
     tick(state);
   }
 
-  const result = buildResult(state);
+  const result = resultOf(state);
   const targets: StarTargets = state.scenario.stars;
   const ctx = quirkContextFor(state, result);
   return {
     result,
+    quirks: ctx,
     stars: computeStars(result, targets),
     connections: computeConnections(result, ctx),
     ticks: state.tick,
